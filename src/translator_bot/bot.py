@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from datetime import UTC, datetime
 
 import discord
 from discord import app_commands
@@ -10,6 +12,8 @@ from .config import Config
 from .crypto import decrypt
 from .db import Store
 from .discord_io import DiscordPoster, snapshot
+from .models import SourceMessage
+from .reconcile import reconcile
 from .relay import Relay
 
 log = logging.getLogger(__name__)
@@ -30,6 +34,7 @@ class TranslatorBot(discord.Client):
         super().__init__(intents=intents, allowed_mentions=discord.AllowedMentions.none())
         self.config = config
         self.tree = app_commands.CommandTree(self)
+        self._catch_up: asyncio.Task | None = None
 
     async def setup_hook(self) -> None:
         self.store = await Store.open(self.config.db_path)
@@ -51,6 +56,24 @@ class TranslatorBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s on %d server(s)", self.user, len(self.guilds))
+        if self._catch_up is None:  # on_ready fires again after every reconnect
+            self._catch_up = asyncio.create_task(
+                reconcile(self.store, self.relay, self._fetch_history, datetime.now(UTC))
+            )
+
+    async def _fetch_history(self, channel_id: int, after_id: int) -> list[SourceMessage] | None:
+        channel = self.get_channel(channel_id)
+        if channel is None:
+            return None
+        own = await self.store.own_webhook_ids()
+        try:
+            return [
+                snapshot(message, own_webhook_ids=own)
+                async for message in channel.history(after=discord.Object(after_id), oldest_first=True, limit=None)
+                if message.type in RELAYED_TYPES
+            ]
+        except (discord.Forbidden, discord.NotFound):
+            return None
 
     async def on_message(self, message: discord.Message) -> None:
         if message.guild is None or message.type not in RELAYED_TYPES:
