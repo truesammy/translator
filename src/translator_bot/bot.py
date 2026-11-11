@@ -4,6 +4,8 @@ import discord
 from discord import app_commands
 
 from .chain import TranslatorChain, build_chain
+from .commands.embed import register_embed_commands
+from .commands.setup import register_setup_commands
 from .config import Config
 from .crypto import decrypt
 from .db import Store
@@ -33,6 +35,8 @@ class TranslatorBot(discord.Client):
         self.store = await Store.open(self.config.db_path)
         self.poster = DiscordPoster(self, self.store)
         self.relay = Relay(self.store, self.poster, self.chain_for)
+        register_setup_commands(self)
+        register_embed_commands(self)
         await self.tree.sync()
 
     async def close(self) -> None:
