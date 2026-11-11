@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "translator-bot"
+version = "0.1.0"
+description = "Discord bot that relays announcements into many channels, translated"
+requires-python = ">=3.12"
+dependencies = [
+    "discord.py>=2.4",
+    "aiosqlite",
+    "cryptography",
+    "deepl",
+    "PyDeepLX",
+    "deep-translator",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+testpaths = ["tests"]
