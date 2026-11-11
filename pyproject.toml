@@ -13,6 +13,7 @@ dependencies = [
     "cryptography",
     "deepl",
     "PyDeepLX",
+    "httpx<0.28",  # PyDeepLX 1.0.7 passes `proxies`, which httpx 0.28 removed
     "deep-translator",
 ]
 
