@@ -20,6 +20,34 @@ def chain(*providers) -> TranslatorChain:
     return TranslatorChain(providers or [FakeTranslator()])
 
 
+class FakePoster:
+    """Records what the relay would post to Discord."""
+
+    def __init__(self):
+        self.sent, self.edited, self.deleted, self.failed = [], [], [], []
+        self.fail_channels: set[int] = set()
+        self.gate = None  # an asyncio.Event that send() waits for
+        self._next_id = 1000
+
+    async def send(self, channel_id, author_name, avatar_url, part):
+        if self.gate:
+            await self.gate.wait()
+        if channel_id in self.fail_channels:
+            raise RuntimeError("no permission")
+        self._next_id += 1
+        self.sent.append((channel_id, author_name, part))
+        return self._next_id
+
+    async def edit(self, channel_id, message_id, part):
+        self.edited.append((channel_id, message_id, part))
+
+    async def delete(self, channel_id, message_id):
+        self.deleted.append((channel_id, message_id))
+
+    async def mark_failed(self, msg):
+        self.failed.append(msg.id)
+
+
 class FakeTranslator:
     """Prefixes every text with the target language code, e.g. "[de] hi"."""
 
