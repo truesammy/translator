@@ -87,6 +87,14 @@ class Store:
     async def links_touching_channel(self, channel_id: int) -> list[Link]:
         return await self._links("source_id = ? OR target_id = ?", (channel_id, channel_id))
 
+    async def all_links(self) -> list[Link]:
+        return await self._links("1 = 1", ())
+
+    async def guild_ids(self) -> list[int]:
+        """Every server that has any data here."""
+        union = " UNION ".join(f"SELECT guild_id FROM {table}" for table in TABLES)
+        return [row[0] for row in await self._rows(f"{union} ORDER BY guild_id")]
+
     async def source_channel_ids(self) -> list[int]:
         return [row[0] for row in await self._rows("SELECT DISTINCT source_id FROM links ORDER BY source_id")]
 

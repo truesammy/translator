@@ -155,3 +155,34 @@ async def test_remove_link_without_deleting_messages(env):
     await env.relay.handle_create(make_msg(id=1, channel_id=100))
     await env.relay.remove_link(100, 201, delete_messages=False)
     assert env.poster.deleted == [] and await env.store.get_parts(1, 201) == []
+
+
+async def test_delete_keeps_tracking_parts_it_could_not_delete(env):
+    await env.relay.handle_create(make_msg(id=1, channel_id=100))
+    stuck = await env.store.get_parts(1, 201)
+    env.poster.fail_delete = {201}
+    await env.relay.handle_delete(1)
+    assert await env.store.all_parts(1) == {201: stuck}
+    assert await env.store.get_source_hash(1) is not None
+    env.poster.fail_delete = set()
+    await env.relay.handle_delete(1)
+    assert await env.store.get_source_hash(1) is None and await env.store.all_parts(1) == {}
+
+
+async def test_edit_replaces_a_part_that_is_gone(env):
+    await env.relay.handle_create(make_msg(id=1, channel_id=100, content="a"))
+    (lost,) = await env.store.get_parts(1, 201)
+    env.poster.gone = {lost}
+    await env.relay.handle_edit(make_msg(id=1, channel_id=100, content="b"))
+    (replacement,) = await env.store.get_parts(1, 201)
+    assert replacement != lost
+    channel, _, part = env.poster.sent[-1]
+    assert (channel, part.content, part.notify) == (201, "[de] b", False)
+    assert [c for c, _, _ in env.poster.edited] == [202]
+
+
+async def test_real_pings_are_passed_on_and_edits_never_ping(env):
+    msg = make_msg(id=1, channel_id=100, content="@everyone <@&7> hi", mention_everyone=True, role_mention_ids=(7,))
+    await env.relay.handle_create(msg)
+    pings = {channel: part.ping_roles for channel, _, part in env.poster.sent}
+    assert pings == {201: (7,), 202: (7, 5)}

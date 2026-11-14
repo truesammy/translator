@@ -3,6 +3,7 @@ import logging
 from datetime import UTC, datetime
 
 import discord
+from cryptography.fernet import InvalidToken
 from discord import app_commands
 
 from .chain import TranslatorChain, build_chain
@@ -13,12 +14,18 @@ from .crypto import decrypt
 from .db import Store
 from .discord_io import DiscordPoster, snapshot
 from .models import SourceMessage
-from .reconcile import reconcile
+from .reconcile import prune, reconcile
 from .relay import Relay
 
 log = logging.getLogger(__name__)
 
-RELAYED_TYPES = (discord.MessageType.default, discord.MessageType.reply)
+RELAYED_TYPES = (
+    discord.MessageType.default,
+    discord.MessageType.reply,
+    # what another bot posts as the answer to one of its slash or context-menu commands
+    discord.MessageType.chat_input_command,
+    discord.MessageType.context_menu_command,
+)
 
 
 class TranslatorBot(discord.Client):
@@ -45,21 +52,61 @@ class TranslatorBot(discord.Client):
         await self.tree.sync()
 
     async def close(self) -> None:
+        if self._catch_up:
+            self._catch_up.cancel()
         await super().close()
-        if hasattr(self, "store"):
+        if getattr(self, "poster", None):
             await self.poster.close()
+        if getattr(self, "store", None):
             await self.store.close()
 
     async def chain_for(self, guild_id: int) -> TranslatorChain:
         encrypted = await self.store.get_deepl_key(guild_id)
-        return build_chain(decrypt(self.config.fernet_key, encrypted) if encrypted else None)
+        key = None
+        if encrypted:
+            try:
+                key = decrypt(self.config.fernet_key, encrypted)
+            except InvalidToken:  # ENCRYPTION_KEY changed: translate without the key rather than not at all
+                log.warning("The DeepL key of server %s cannot be decrypted, using the free fallbacks", guild_id)
+        return build_chain(key)
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s on %d server(s)", self.user, len(self.guilds))
-        if self._catch_up is None:  # on_ready fires again after every reconnect
-            self._catch_up = asyncio.create_task(
-                reconcile(self.store, self.relay, self._fetch_history, datetime.now(UTC))
-            )
+        self.start_catch_up()
+
+    def start_catch_up(self) -> None:
+        """Runs after every (re)connect, because events are lost while disconnected."""
+        if self._catch_up is None or self._catch_up.done():
+            self._catch_up = asyncio.create_task(self._run_catch_up())
+
+    async def _run_catch_up(self) -> None:
+        try:
+            await prune(self.store, self.relay, self._guild_exists, self._channel_exists)
+            await reconcile(self.store, self.relay, self._fetch_history, datetime.now(UTC))
+        except Exception:
+            log.exception("Catch-up failed")
+
+    async def _guild_exists(self, guild_id: int) -> bool:
+        if self.get_guild(guild_id):
+            return True
+        try:
+            await self.fetch_guild(guild_id)
+        except (discord.NotFound, discord.Forbidden):
+            return False  # proof that the bot is no longer a member
+        except discord.HTTPException:
+            pass  # an outage proves nothing
+        return True
+
+    async def _channel_exists(self, channel_id: int) -> bool:
+        if self.get_channel(channel_id):
+            return True
+        try:
+            await self.fetch_channel(channel_id)
+        except discord.NotFound:
+            return False
+        except discord.HTTPException:
+            pass
+        return True
 
     async def _fetch_history(self, channel_id: int, after_id: int) -> list[SourceMessage] | None:
         channel = self.get_channel(channel_id)

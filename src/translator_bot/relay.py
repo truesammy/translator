@@ -14,6 +14,11 @@ from .render import content_hash, render
 log = logging.getLogger(__name__)
 
 
+class MessageGone(Exception):
+    """Poster.edit raises this when the message cannot be edited any more: it was deleted
+    by hand, or it belongs to a webhook that no longer exists."""
+
+
 class Poster(Protocol):
     async def send(self, channel_id: int, author_name: str, avatar_url: str | None, part: OutgoingPart) -> int: ...
 
@@ -70,10 +75,14 @@ class Relay:
         async with self._locked(source_message_id):
             if await self._store.get_source_hash(source_message_id) is None:
                 return
+            stuck = False
             for target_id, part_ids in (await self._store.all_parts(source_message_id)).items():
-                for part_id in part_ids:
-                    await self._delete(target_id, part_id)
-            await self._store.forget_source(source_message_id)
+                left = [part_id for part_id in part_ids if not await self._delete(target_id, part_id)]
+                await self._store.set_parts(source_message_id, target_id, left)
+                stuck = stuck or bool(left)
+            # What could not be deleted stays tracked, so the next catch-up tries again.
+            if not stuck:
+                await self._store.forget_source(source_message_id)
 
     async def remove_link(self, source_channel_id: int, target_channel_id: int, *, delete_messages: bool = True) -> None:
         # The link goes first, so nothing new is relayed while the old messages are being deleted.
@@ -83,11 +92,13 @@ class Relay:
                 await self._delete(target_channel_id, part_id)
         await self._store.forget_link_parts(source_channel_id, target_channel_id)
 
-    async def _delete(self, channel_id: int, message_id: int) -> None:
+    async def _delete(self, channel_id: int, message_id: int) -> bool:
         try:
             await self._poster.delete(channel_id, message_id)
+            return True
         except Exception as error:
             log.warning("Could not delete message %s in channel %s: %s", message_id, channel_id, error)
+            return False
 
     async def _sync(self, msg: SourceMessage, links: list[Link], *, notify: bool) -> None:
         chain = await self._chain_for(msg.guild_id)
@@ -119,11 +130,15 @@ class Relay:
         try:
             for i, part in enumerate(parts):
                 if i < len(existing):
-                    await self._poster.edit(target, existing[i], part)
-                    posted.append(existing[i])
-                else:
-                    part = replace(part, notify=part.notify and notify)
-                    posted.append(await self._poster.send(target, msg.author_name, msg.author_avatar_url, part))
+                    try:
+                        await self._poster.edit(target, existing[i], part)
+                        posted.append(existing[i])
+                        continue
+                    except MessageGone:
+                        # Replace it, or this target would never get an update again.
+                        await self._delete(target, existing[i])
+                part = replace(part, notify=part.notify and notify)
+                posted.append(await self._poster.send(target, msg.author_name, msg.author_avatar_url, part))
             for surplus in existing[len(parts) :]:
                 await self._poster.delete(target, surplus)
         except Exception as error:

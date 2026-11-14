@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Sequence
 
 from .languages import Language
@@ -15,8 +16,9 @@ class AllProvidersFailed(Exception):
 
 
 class TranslatorChain:
-    def __init__(self, providers: Sequence[Translator]):
+    def __init__(self, providers: Sequence[Translator], timeout: float = 30):
         self._providers = list(providers)
+        self._timeout = timeout  # a hanging provider must not block the message forever
 
     async def translate(self, texts: list[str], target: Language, source: Language | None) -> list[str]:
         """Translate masked texts with the first provider that returns every placeholder intact."""
@@ -27,7 +29,10 @@ class TranslatorChain:
         errors: list[tuple[str, str]] = []
         for provider in self._providers:
             try:
-                translated = await provider.translate(batch, target, source)
+                translated = await asyncio.wait_for(provider.translate(batch, target, source), self._timeout)
+            except TimeoutError:
+                errors.append((provider.name, "timed out"))
+                continue
             except TranslationError as error:
                 errors.append((provider.name, str(error)))
                 continue

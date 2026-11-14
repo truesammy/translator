@@ -16,8 +16,8 @@ original follow along. It is one-way: nothing is translated back.
 1. Create an application at <https://discord.com/developers/applications> and add a bot.
 2. Under **Bot**, turn on **Message Content Intent**.
 3. Invite it with the scopes `bot` and `applications.commands` and these permissions:
-   View Channels, Send Messages, Manage Webhooks, Embed Links, Attach Files,
-   Read Message History, Add Reactions.
+   View Channels, Send Messages, Manage Webhooks, Manage Messages, Embed Links,
+   Attach Files, Read Message History, Add Reactions.
 
 ## Configure
 
@@ -81,6 +81,9 @@ bot's log output.
 - Message text is sent to DeepL and, on the fallbacks, to unofficial DeepL and Google
   endpoints. Those two are not covered by the services' terms, block addresses quickly
   and can stop working at any time. For dependable translations, set a DeepL key.
+- A translation pings only what pinged in the original. `@everyone` written by someone
+  who may not mention everyone stays plain text in every channel.
+- Link previews are not copied. Discord creates them again in the target channel.
 - A message longer than 2000 characters after translation is split into several messages.
 - Edits update text and embeds. Attachments added or removed by an edit are not synced.
 - Threads, forum channels, polls, stickers and voice messages are not relayed.

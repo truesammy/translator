@@ -8,6 +8,7 @@ import discord
 
 from .db import Store
 from .models import Attachment, EmbedData, EmbedField, OutgoingPart, SourceMessage
+from .relay import MessageGone
 
 WEBHOOK_NAME = "Translator"
 _RESERVED = re.compile(r"discord|clyde", re.IGNORECASE)
@@ -62,11 +63,21 @@ def snapshot(message: discord.Message, *, own_webhook_ids: set[int]) -> SourceMe
         author_name=message.author.display_name,
         author_avatar_url=message.author.display_avatar.url,
         content=message.content,
-        # Link previews are left out: Discord builds them again in the target channel.
-        embeds=tuple(embed_to_data(embed) for embed in message.embeds if embed.type == "rich"),
+        embeds=tuple(embed_to_data(embed) for embed in message.embeds if _is_real_embed(embed, message)),
         attachments=tuple(Attachment(a.filename, a.url, a.size) for a in message.attachments),
         from_own_webhook=message.webhook_id in own_webhook_ids,
+        mention_everyone=message.mention_everyone,
+        role_mention_ids=tuple(role.id for role in message.role_mentions),
     )
+
+
+def _is_real_embed(embed: discord.Embed, message: discord.Message) -> bool:
+    """Link previews are left out: Discord builds them again in the target channel.
+    Only bots and webhooks can send embeds, so anything on a person's message is a preview,
+    and so is a bot's embed whose url is a link in the text. Some previews have type "rich"."""
+    if embed.type != "rich" or not message.author.bot:
+        return False
+    return not (embed.url and embed.url in message.content)
 
 
 class DiscordPoster:
@@ -136,7 +147,11 @@ class DiscordPoster:
                     username=sanitize_username(author_name),
                     embeds=[data_to_embed(embed) for embed in part.embeds],
                     files=files,
-                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=part.notify, users=part.notify),
+                    allowed_mentions=discord.AllowedMentions(
+                        everyone=False,
+                        users=part.notify,
+                        roles=[discord.Object(role_id) for role_id in part.ping_roles] if part.notify else False,
+                    ),
                     wait=True,
                     **options,
                 )
@@ -151,20 +166,25 @@ class DiscordPoster:
         channel = self._channel(channel_id)
         webhook = await self.ensure_webhook(channel)
         content, _ = await self._content_and_files(part, channel, upload=False)
-        await webhook.edit_message(
-            message_id,
-            content=content,
-            embeds=[data_to_embed(embed) for embed in part.embeds],
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
+        try:
+            await webhook.edit_message(
+                message_id,
+                content=content,
+                embeds=[data_to_embed(embed) for embed in part.embeds],
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except discord.NotFound:
+            # Deleted by hand, or posted by an earlier webhook that was removed.
+            raise MessageGone() from None
 
     async def delete(self, channel_id: int, message_id: int) -> None:
         channel = self._client.get_channel(channel_id)
         if channel is None:
             return
-        webhook = await self.ensure_webhook(channel)
+        # As the bot, not through the webhook: a webhook can only delete its own messages,
+        # so translations of a replaced webhook would stay behind for good.
         try:
-            await webhook.delete_message(message_id)
+            await channel.get_partial_message(message_id).delete()
         except discord.NotFound:
             pass
 

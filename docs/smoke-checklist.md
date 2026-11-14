@@ -21,3 +21,11 @@ tests do not talk to Discord. Use channels `#src`, `#de`, `#fr` and a role `@Deu
 | 14 | `/link remove #src #fr` | Reply comes at once. All translations in `#fr` disappear. |
 | 15 | Delete `#de` | `/link list` no longer shows it. |
 | 16 | Remove the DeepL key and block outgoing network access, then post in `#src` | The message gets a ⚠️ reaction and the bot's log names each provider and its error. |
+| 17 | Post a link to a tweet or a YouTube video in `#src` and wait ten seconds | Each target shows one preview made by Discord, not a second translated copy. |
+| 18 | As a member without the Mention Everyone permission, post `@everyone hi` in `#src` | Nobody is pinged in any target, `@everyone` stays text. |
+| 19 | Let another bot answer a slash command in `#src` | The answer is translated like any message. |
+| 20 | Post in `#src`, delete the "Translator" webhook of `#de` in the channel settings, post again, then delete the first message | The second message arrives through a new webhook. The first translation is deleted too. |
+| 21 | After step 20, edit a message that was posted before the webhook was deleted | Its translation in `#de` is replaced by a new one. |
+| 22 | Delete one translation in `#de` by hand, then edit its original | A new translation appears in `#de`. |
+| 23 | Set your server nickname to `Discord Updates` and post in `#src` | The translation is posted, under a name that looks the same. |
+| 24 | Take Manage Webhooks away from the bot in `#src`, then `/embed create #src` | The bot says which permission is missing, and no form opens. |

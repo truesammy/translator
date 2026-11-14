@@ -13,8 +13,22 @@ async def test_plain_text():
 
 
 async def test_everyone_becomes_language_role():
-    parts = await render(make_msg(content="@everyone news @here"), make_link(role_id=5), None, chain())
+    msg = make_msg(content="@everyone news @here", mention_everyone=True)
+    parts = await render(msg, make_link(role_id=5), None, chain())
     assert parts[0].content == "[de] <@&5> news <@&5>"
+    assert parts[0].ping_roles == (5,)
+
+
+async def test_everyone_that_did_not_ping_in_the_original_does_not_ping_the_role():
+    # Written by someone without the Mention Everyone permission: plain text in the original.
+    parts = await render(make_msg(content="@everyone news"), make_link(role_id=5), None, chain())
+    assert parts[0].content == "[de] @everyone news" and parts[0].ping_roles == ()
+
+
+async def test_only_roles_that_pinged_in_the_original_ping_again():
+    msg = make_msg(content="<@&7> and <@&8>", role_mention_ids=(7,))
+    parts = await render(msg, make_link(role_id=5), None, chain())
+    assert parts[0].ping_roles == (7,)
 
 
 async def test_everyone_stays_text_without_role():

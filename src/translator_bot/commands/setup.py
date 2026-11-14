@@ -18,6 +18,7 @@ TARGET_PERMISSIONS = {
     "view_channel": "View Channel",
     "send_messages": "Send Messages",
     "manage_webhooks": "Manage Webhooks",
+    "manage_messages": "Manage Messages",  # to delete translations, also those of an earlier webhook
     "embed_links": "Embed Links",
     "attach_files": "Attach Files",
 }
@@ -123,7 +124,13 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
                 interaction, f"I'm missing these permissions in {target.mention}: {', '.join(missing)}."
             )
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await bot.poster.ensure_webhook(target)
+        try:
+            await bot.poster.ensure_webhook(target)
+        except discord.HTTPException as error:  # e.g. the channel already has the maximum number of webhooks
+            await interaction.followup.send(
+                f"Could not create a webhook in {target.mention}: {error.text or error.status}", ephemeral=True
+            )
+            return
         await bot.store.add_link(Link(interaction.guild_id, source.id, target.id, lang.code, role.id if role else None))
         ping = f", pinging {role.mention}" if role else ""
         await interaction.followup.send(

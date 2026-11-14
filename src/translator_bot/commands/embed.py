@@ -98,17 +98,18 @@ class EmbedModal(discord.ui.Modal):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         # Only the five form fields change; anything else on the embed stays.
-        await self._on_valid(
-            interaction,
-            replace(
-                self._current,
-                title=new.title,
-                description=new.description,
-                color=new.color,
-                image_url=new.image_url,
-                footer_text=new.footer_text,
-            ),
+        merged = replace(
+            self._current,
+            title=new.title,
+            description=new.description,
+            color=new.color,
+            image_url=new.image_url,
+            footer_text=new.footer_text,
         )
+        try:
+            await self._on_valid(interaction, merged)
+        except discord.HTTPException as error:  # without a reply the admin would stare at "thinking" forever
+            await interaction.followup.send(f"Discord refused that: {error.text or error.status}", ephemeral=True)
 
 
 def register_embed_commands(bot: "TranslatorBot") -> None:
@@ -122,6 +123,11 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
         if not await bot.store.links_for_source(channel.id):
             await interaction.response.send_message(
                 "That channel has no links. Add one with /link add first.", ephemeral=True
+            )
+            return
+        if not channel.permissions_for(interaction.guild.me).manage_webhooks:
+            await interaction.response.send_message(
+                f"I need Manage Webhooks in {channel.mention} to post under your name.", ephemeral=True
             )
             return
 

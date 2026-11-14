@@ -70,8 +70,14 @@ async def render(
 
     role = f"<@&{link.role_id}>"
     swap = {"@everyone": role, "@here": role} if link.role_id else {}
+    # In the message text the role replaces @everyone only if the original really pinged.
+    # Embed text never pings, so there the replacement is always safe.
+    pinged = msg.mention_everyone and bool(link.role_id)
     restored = iter(
-        [unmask(text, spans, swap, original=before) for text, (before, spans) in zip(texts, masked)]
+        [
+            unmask(text, spans, swap if i > 0 or pinged else {}, original=before)
+            for i, (text, (before, spans)) in enumerate(zip(texts, masked))
+        ]
     )
     content = next(restored)
     embeds = tuple(_rebuild_embed(embed, restored) for embed in msg.embeds)
@@ -84,6 +90,7 @@ async def render(
             embeds=embeds if i == last else (),
             attachments=msg.attachments if i == last else (),
             notify=i == 0,
+            ping_roles=msg.role_mention_ids + ((link.role_id,) if pinged else ()) if i == 0 else (),
         )
         for i, chunk in enumerate(chunks)
     ]

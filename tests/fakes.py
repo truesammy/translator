@@ -1,6 +1,7 @@
 from translator_bot.chain import TranslatorChain
 from translator_bot.models import EmbedData, Link, SourceMessage
 from translator_bot.providers.base import TranslationError
+from translator_bot.relay import MessageGone
 
 
 def make_msg(**overrides) -> SourceMessage:
@@ -26,6 +27,8 @@ class FakePoster:
     def __init__(self):
         self.sent, self.edited, self.deleted, self.failed = [], [], [], []
         self.fail_channels: set[int] = set()
+        self.fail_delete: set[int] = set()  # channels where delete() fails
+        self.gone: set[int] = set()  # message ids that can no longer be edited
         self.gate = None  # an asyncio.Event that send() waits for
         self._next_id = 1000
 
@@ -39,9 +42,13 @@ class FakePoster:
         return self._next_id
 
     async def edit(self, channel_id, message_id, part):
+        if message_id in self.gone:
+            raise MessageGone()
         self.edited.append((channel_id, message_id, part))
 
     async def delete(self, channel_id, message_id):
+        if channel_id in self.fail_delete:
+            raise RuntimeError("no permission")
         self.deleted.append((channel_id, message_id))
 
     async def mark_failed(self, msg):

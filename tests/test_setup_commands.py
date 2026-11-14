@@ -19,8 +19,8 @@ def test_format_links_empty():
 def test_missing_target_permissions():
     assert missing_target_permissions(discord.Permissions.all()) == []
     perms = discord.Permissions(view_channel=True, send_messages=True, embed_links=True, attach_files=True)
-    assert missing_target_permissions(perms) == ["Manage Webhooks"]
-    assert len(missing_target_permissions(discord.Permissions.none())) == 5
+    assert missing_target_permissions(perms) == ["Manage Webhooks", "Manage Messages"]
+    assert len(missing_target_permissions(discord.Permissions.none())) == 6
 
 
 def test_language_choices():

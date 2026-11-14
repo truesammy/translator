@@ -160,3 +160,11 @@ async def test_schema_survives_reopen(tmp_path):
     s = await Store.open(path)
     assert len(await s.links_for_source(100)) == 1
     await s.close()
+
+
+async def test_guild_ids_and_all_links(store):
+    await store.add_link(Link(1, 100, 201, "de", None))
+    await store.add_link(Link(2, 300, 301, "fr", None))
+    await store.set_deepl_key(3, b"k")
+    assert await store.guild_ids() == [1, 2, 3]
+    assert len(await store.all_links()) == 2

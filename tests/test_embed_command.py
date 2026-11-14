@@ -1,7 +1,11 @@
+from types import SimpleNamespace
+
+import discord
 import pytest
 
 from translator_bot.commands.embed import (
     EmbedInputError,
+    EmbedModal,
     build_embed,
     format_color,
     parse_color,
@@ -64,3 +68,23 @@ def test_build_embed_blank_optionals_become_none():
 def test_build_embed_needs_text():
     with pytest.raises(EmbedInputError):
         build_embed("T", "   ", "", "", "")
+
+
+async def test_embed_modal_reports_discord_errors_instead_of_hanging():
+    replies = []
+
+    async def refuse(interaction, data):
+        response = SimpleNamespace(status=403, reason="Forbidden")
+        raise discord.Forbidden(response, {"code": 50013, "message": "Missing Permissions"})
+
+    async def defer(**kwargs):
+        pass
+
+    async def send(text, **kwargs):
+        replies.append(text)
+
+    modal = EmbedModal("New embed", refuse)
+    modal.text_input._value = "Body"
+    interaction = SimpleNamespace(response=SimpleNamespace(defer=defer), followup=SimpleNamespace(send=send))
+    await modal.on_submit(interaction)
+    assert len(replies) == 1 and "Missing Permissions" in replies[0]

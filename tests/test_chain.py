@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from fakes import FakeTranslator
@@ -71,3 +73,19 @@ async def test_nothing_translatable_calls_no_provider():
 def test_build_chain_order():
     assert [p.name for p in build_chain("k:fx")._providers] == ["deepl", "deeplx", "google"]
     assert [p.name for p in build_chain(None)._providers] == ["deeplx", "google"]
+
+
+class Hanging(FakeTranslator):
+    async def translate(self, texts, target, source):
+        await asyncio.sleep(5)
+
+
+async def test_hanging_provider_times_out_and_falls_through():
+    chain = TranslatorChain([Hanging("a"), FakeTranslator("b")], timeout=0.01)
+    assert await chain.translate(["hi"], DE, None) == ["[de] hi"]
+
+
+async def test_timeout_is_reported():
+    with pytest.raises(AllProvidersFailed) as error:
+        await TranslatorChain([Hanging("a")], timeout=0.01).translate(["hi"], DE, None)
+    assert error.value.errors == [("a", "timed out")]
