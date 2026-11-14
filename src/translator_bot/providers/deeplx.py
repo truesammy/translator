@@ -22,5 +22,9 @@ class DeepLX:
                 raise TranslationError(f"{type(error).__name__}: {error}") from None
             if not isinstance(result, str) or not result.strip():
                 raise TranslationError("empty result")
+            # DeepL answers outdated clients with this notice instead of a translation.
+            # shortcut: matches the English wording only, widen if DeepL changes or localizes it
+            if "older version of DeepL" in result and "older version of DeepL" not in text:
+                raise TranslationError("DeepL rejected the client as outdated")
             results.append(result)
         return results
