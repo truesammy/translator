@@ -6,6 +6,8 @@ import pytest
 from translator_bot.commands.embed import (
     EmbedInputError,
     EmbedModal,
+    with_editor,
+    without_editor,
     build_embed,
     format_color,
     parse_color,
@@ -88,3 +90,11 @@ async def test_embed_modal_reports_discord_errors_instead_of_hanging():
     interaction = SimpleNamespace(response=SimpleNamespace(defer=defer), followup=SimpleNamespace(send=send))
     await modal.on_submit(interaction)
     assert len(replies) == 1 and "Missing Permissions" in replies[0]
+
+
+def test_editor_line_is_added_and_removed_again():
+    assert with_editor(None, "Mika") == "Edited by Mika"
+    assert with_editor("v2", "Mika") == "v2 · Edited by Mika"
+    assert without_editor("v2 · Edited by Mika") == "v2"
+    assert without_editor("Edited by Mika") is None
+    assert without_editor("v2") == "v2" and without_editor(None) is None

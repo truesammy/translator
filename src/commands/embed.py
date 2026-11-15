@@ -8,6 +8,7 @@ from discord import app_commands
 
 from ..discord_io import data_to_embed, embed_to_data, sanitize_username, snapshot
 from ..models import EmbedData
+from ..splitting import truncate
 
 if TYPE_CHECKING:
     from ..bot import TranslatorBot
@@ -47,6 +48,19 @@ def parse_message_ref(text: str) -> int:
     if not match:
         raise EmbedInputError("Give a message ID or a message link.")
     return int(match.group(1))
+
+
+# shortcut: a footer the admin wrote that itself contains "Edited by" is cut there on the next edit
+_EDITOR_LINE = re.compile(r"(?:^| · )Edited by .*$")
+
+
+def with_editor(footer: str | None, name: str) -> str:
+    """The footer of an edited embed names who edited it last."""
+    return f"{footer} · Edited by {name}" if footer else f"Edited by {name}"
+
+
+def without_editor(footer: str | None) -> str | None:
+    return _EDITOR_LINE.sub("", footer or "") or None
 
 
 def build_embed(title: str, description: str, color: str, image_url: str, footer: str) -> EmbedData:
@@ -168,12 +182,17 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
             return await refuse("That message has no embed any more.")
 
         async def save(submitted: discord.Interaction, data: EmbedData) -> None:
+            # Discord cannot rename a posted message, so the editor is named in the footer.
+            footer = truncate(with_editor(data.footer_text, submitted.user.display_name), 2048)
+            data = replace(data, footer_text=footer)
             webhook = await bot.poster.ensure_webhook(channel)
             await webhook.edit_message(message_id, embed=data_to_embed(data))
             edited = await channel.fetch_message(message_id)
             await bot.relay.handle_edit(snapshot(edited, own_webhook_ids=set()))
             await submitted.followup.send("Embed updated.", ephemeral=True)
 
-        await interaction.response.send_modal(EmbedModal("Edit embed", save, embed_to_data(original.embeds[0])))
+        current = embed_to_data(original.embeds[0])
+        current = replace(current, footer_text=without_editor(current.footer_text))
+        await interaction.response.send_modal(EmbedModal("Edit embed", save, current))
 
     bot.tree.add_command(embed)
