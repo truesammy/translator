@@ -133,6 +133,9 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
             )
             return
         await bot.store.add_link(Link(interaction.guild_id, source.id, target.id, lang.code, role.id if role else None))
+        if await bot.store.get_last_seen(source.id) is None:
+            # Catch-up starts here, so a message posted while the bot is offline is not missed.
+            await bot.store.set_last_seen(interaction.guild_id, source.id, interaction.id)
         ping = f", pinging {role.mention}" if role else ""
         await interaction.followup.send(
             f"Linked {source.mention} → {target.mention} in {lang.name}{ping}.", ephemeral=True
@@ -188,13 +191,13 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
     @apikey.command(name="remove", description="Remove this server's DeepL API key")
     async def apikey_remove(interaction: discord.Interaction) -> None:
         await bot.store.set_deepl_key(interaction.guild_id, None)
-        await reply(interaction, "DeepL key removed. Using the free fallbacks.")
+        await reply(interaction, "DeepL key removed. Using Google Translate.")
 
     @apikey.command(name="status", description="Show whether a DeepL key is set and how much is used")
     async def apikey_status(interaction: discord.Interaction) -> None:
         encrypted = await bot.store.get_deepl_key(interaction.guild_id)
         if encrypted is None:
-            return await reply(interaction, "No DeepL key set. Using the free fallbacks.")
+            return await reply(interaction, "No DeepL key set. Using Google Translate.")
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             used, limit = await DeepLOfficial(decrypt(bot.config.fernet_key, encrypted)).usage()

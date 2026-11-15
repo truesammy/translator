@@ -98,6 +98,7 @@ async def render(
             attachments=msg.attachments if i == last else (),
             notify=i == 0,
             ping_roles=msg.role_mention_ids + ((link.role_id,) if pinged else ()) if i == 0 else (),
+            ping_users=msg.user_mention_ids if i == 0 else (),
         )
         for i, chunk in enumerate(chunks)
     ]

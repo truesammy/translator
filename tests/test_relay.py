@@ -196,6 +196,7 @@ async def test_failed_translation_is_retried_by_the_next_catch_up(env):
     env.providers[0].fail = None
     await env.relay.handle_edit(msg)  # what catch-up calls for every tracked message
     assert len(env.poster.sent) == 2
+    assert all(part.notify for _, _, part in env.poster.sent)  # posted for the first time, so it pings
 
 
 async def test_failed_post_is_marked_and_retried(env):
@@ -224,3 +225,14 @@ async def test_at_most_three_targets_are_synced_at_once(env):
     env.providers[0].translate = slow
     await env.relay.handle_create(make_msg(id=1, channel_id=100, content="hi"))
     assert peak == 3 and len(env.poster.sent) == 9
+
+
+async def test_hash_stays_empty_until_every_target_is_done(env):
+    # A crash while posting must leave the message for the next catch-up.
+    env.poster.gate = asyncio.Event()
+    create = asyncio.create_task(env.relay.handle_create(make_msg(id=1, channel_id=100)))
+    await asyncio.sleep(0.01)
+    assert await env.store.get_source_hash(1) == ""
+    env.poster.gate.set()
+    await create
+    assert await env.store.get_source_hash(1)

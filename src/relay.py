@@ -60,9 +60,10 @@ class Relay:
             links = await self._store.links_for_source(msg.channel_id)
             if not links or await self._store.get_source_hash(msg.id) is not None:
                 return
-            await self._store.record_source(msg.id, msg.guild_id, msg.channel_id, content_hash(msg))
+            # Empty until every target is done: a crash in between leaves it for the next catch-up.
+            await self._store.record_source(msg.id, msg.guild_id, msg.channel_id, "")
             await self._store.set_last_seen(msg.guild_id, msg.channel_id, msg.id)
-            await self._sync(msg, links, notify=True)
+            await self._sync(msg, links, content_hash(msg), notify=True)
 
     async def handle_edit(self, msg: SourceMessage) -> None:
         async with self._locked(msg.id):
@@ -70,8 +71,8 @@ class Relay:
             new = content_hash(msg)
             if known is None or known == new:
                 return
-            await self._store.record_source(msg.id, msg.guild_id, msg.channel_id, new)
-            await self._sync(msg, await self._store.links_for_source(msg.channel_id), notify=False)
+            # An empty hash means the first attempt failed: what is posted now is new, so it may ping.
+            await self._sync(msg, await self._store.links_for_source(msg.channel_id), new, notify=known == "")
 
     async def handle_delete(self, source_message_id: int) -> None:
         async with self._locked(source_message_id):
@@ -102,15 +103,15 @@ class Relay:
             log.warning("Could not delete message %s in channel %s: %s", message_id, channel_id, error)
             return False
 
-    async def _sync(self, msg: SourceMessage, links: list[Link], *, notify: bool) -> None:
+    async def _sync(self, msg: SourceMessage, links: list[Link], new_hash: str, *, notify: bool) -> None:
         chain = await self._chain_for(msg.guild_id)
         source_language = await self._store.get_source_language(msg.channel_id)
         done = await asyncio.gather(
             *(self._sync_link(msg, link, source_language, chain, notify) for link in links)
         )
+        # An empty hash never matches, so the next catch-up tries this message again.
+        await self._store.record_source(msg.id, msg.guild_id, msg.channel_id, new_hash if all(done) else "")
         if not all(done):
-            # An empty hash never matches, so the next catch-up tries this message again.
-            await self._store.record_source(msg.id, msg.guild_id, msg.channel_id, "")
             await self._poster.mark_failed(msg)
 
     async def _sync_link(

@@ -57,6 +57,10 @@ volume `data`, so it survives updates.
 | Update to the newest image | `docker compose pull && docker compose up -d` |
 | Stop | `docker compose down` |
 | Back up the database | `docker compose cp bot:/data/bot.db ./bot.db` |
+| Go back to an older version | Set `image:` in `compose.yaml` to `ghcr.io/truesammy/translator:<commit hash>` |
+
+Keep the backup secret: it holds the webhook tokens, and with one of them anyone can post in
+that channel.
 
 ### Without Docker
 

@@ -69,6 +69,7 @@ def snapshot(message: discord.Message, *, own_webhook_ids: set[int]) -> SourceMe
         from_own_webhook=message.webhook_id in own_webhook_ids,
         mention_everyone=message.mention_everyone,
         role_mention_ids=tuple(role.id for role in message.role_mentions),
+        user_mention_ids=tuple(user.id for user in message.mentions),
     )
 
 
@@ -150,7 +151,7 @@ class DiscordPoster:
                     files=files,
                     allowed_mentions=discord.AllowedMentions(
                         everyone=False,
-                        users=part.notify,
+                        users=[discord.Object(user_id) for user_id in part.ping_users] if part.notify else False,
                         roles=[discord.Object(role_id) for role_id in part.ping_roles] if part.notify else False,
                     ),
                     wait=True,

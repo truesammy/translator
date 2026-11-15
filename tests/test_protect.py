@@ -114,3 +114,19 @@ def test_intact_without_placeholders():
 )
 def test_has_translatable_text(s, expected):
     assert has_translatable_text(mask(s)[0]) is expected
+
+
+@pytest.mark.parametrize("s", ["example.org", "visit example.org.", "play.example.org/shop now", "see config.json"])
+def test_bare_domains_are_hidden(s):
+    masked, spans = mask(s)
+    assert len(spans) == 1 and spans[0].rstrip("/").split("/")[0] in ("example.org", "play.example.org", "config.json")
+    assert "example" not in masked and "config" not in masked and rt(s) == s
+
+
+@pytest.mark.parametrize("s", ["End.Next sentence", "z.B. heute", "e.g. this", "version 1.5 is out", "mail a@b.de"])
+def test_ordinary_text_with_dots_is_not_hidden(s):
+    assert mask(s) == (s, [])
+
+
+def test_footer_that_is_only_a_domain_is_not_translated():
+    assert not has_translatable_text(mask("example.org")[0])

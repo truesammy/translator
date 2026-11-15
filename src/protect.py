@@ -18,6 +18,7 @@ _PROTECTED = re.compile(
     | \]\(\s*<?https?://[^\s)]+>?(?:\s+"[^"\n]*")?\)  # ](url) of a masked link
     | <https?://[^\s>]+>                              # <url>
     | https?://[^\s<>]+                               # bare url
+    | (?<![\w@./-])(?:[a-z0-9][a-z0-9-]*\.)+[a-z]{2,}(?![\w-])(?:/[^\s<>]*)?  # bare domain: example.org, a.b/c
     | ^[ \t]*(?:\#{1,3}|-\#|>>>|>|[-*]|\d+\.)[ \t]+   # heading, quote, list prefix
     | \*{1,3} | __ | ~~ | \|\|                        # inline markers
     | (?<![^\W_])_ | _(?![^\W_])                      # single underscore, not inside a word

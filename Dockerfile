@@ -12,4 +12,6 @@ USER bot
 VOLUME /data
 ENV DATABASE_PATH=/data/bot.db
 
+# Python as process 1 ignores SIGTERM; SIGINT makes the bot close cleanly.
+STOPSIGNAL SIGINT
 CMD ["python", "-m", "translator_bot"]

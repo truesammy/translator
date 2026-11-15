@@ -67,7 +67,7 @@ class TranslatorBot(discord.Client):
             try:
                 key = decrypt(self.config.fernet_key, encrypted)
             except InvalidToken:  # ENCRYPTION_KEY changed: translate without the key rather than not at all
-                log.warning("The DeepL key of server %s cannot be decrypted, using the free fallbacks", guild_id)
+                log.warning("The DeepL key of server %s cannot be decrypted, using Google Translate", guild_id)
         return build_chain(key)
 
     async def on_ready(self) -> None:
@@ -110,7 +110,9 @@ class TranslatorBot(discord.Client):
 
     async def _fetch_history(self, channel_id: int, after_id: int) -> list[SourceMessage] | None:
         channel = self.get_channel(channel_id)
-        if channel is None:
+        # Without this permission Discord answers with an empty list, which would look like
+        # every message was deleted.
+        if channel is None or not channel.permissions_for(channel.guild.me).read_message_history:
             return None
         own = await self.store.own_webhook_ids()
         try:

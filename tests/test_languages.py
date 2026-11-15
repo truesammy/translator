@@ -2,8 +2,8 @@ from translator_bot.languages import LANGUAGES, deepl_code, get_language, search
 
 
 def test_deepl_codes():
-    codes = [deepl_code(get_language(c)) for c in ("en", "pt", "zh-CN", "zh-TW", "de")]
-    assert codes == ["EN-US", "PT-BR", "ZH-HANS", "ZH-HANT", "DE"]
+    codes = [deepl_code(get_language(c)) for c in ("en", "pt", "zh-CN", "zh-TW", "de", "iw")]
+    assert codes == ["EN-US", "PT-BR", "ZH-HANS", "ZH-HANT", "DE", "HE"]
 
 
 def test_names_are_title_cased():

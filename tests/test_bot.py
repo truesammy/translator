@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import discord
 from cryptography.fernet import Fernet
 
@@ -64,3 +66,13 @@ async def test_catch_up_runs_again_after_a_reconnect(tmp_path, monkeypatch):
     bot.start_catch_up()
     await bot._catch_up
     assert len(runs) == 2
+
+
+async def test_history_without_the_permission_to_read_it_counts_as_unreadable(tmp_path):
+    # Discord answers with an empty list then, which catch-up would take for "everything was deleted".
+    bot = make_bot(tmp_path)
+    permissions = SimpleNamespace(read_message_history=False)
+    channel = SimpleNamespace(guild=SimpleNamespace(me=None), permissions_for=lambda member: permissions)
+    bot.get_channel = lambda channel_id: channel
+    assert await bot._fetch_history(100, 0) is None
+    await bot.close()

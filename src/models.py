@@ -48,6 +48,7 @@ class SourceMessage:
     # someone without the permission is just text there, and must stay text in the targets.
     mention_everyone: bool = False
     role_mention_ids: tuple[int, ...] = ()
+    user_mention_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,3 +67,4 @@ class OutgoingPart:
     attachments: tuple[Attachment, ...]
     notify: bool
     ping_roles: tuple[int, ...] = ()  # roles this part may notify, only when `notify` is set
+    ping_users: tuple[int, ...] = ()  # users this part may notify, only when `notify` is set

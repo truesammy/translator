@@ -26,9 +26,11 @@ class TranslatorChain:
             return list(texts)
         batch = [texts[i] for i in wanted]
         errors: list[tuple[str, str]] = []
+        # Some providers take one request per text, so a big embed gets more time.
+        timeout = self._timeout * (1 + len(batch) / 10)
         for provider in self._providers:
             try:
-                translated = await asyncio.wait_for(provider.translate(batch, target, source), self._timeout)
+                translated = await asyncio.wait_for(provider.translate(batch, target, source), timeout)
             except TimeoutError:
                 errors.append((provider.name, "timed out"))
                 continue

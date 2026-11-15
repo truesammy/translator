@@ -32,4 +32,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/truesammy/translator:latest
+          tags: |
+            ghcr.io/truesammy/translator:latest
+            ghcr.io/truesammy/translator:${{ github.sha }}

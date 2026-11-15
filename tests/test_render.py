@@ -160,3 +160,8 @@ def test_hash_ignores_the_signature_of_discord_image_links():
 
     assert content_hash(msg("aa")) == content_hash(msg("bb"))
     assert content_hash(make_msg(content="a?b")) != content_hash(make_msg(content="a?c"))
+
+
+async def test_only_users_that_pinged_in_the_original_ping_again():
+    parts = await render(make_msg(content="<@9> and <@8>", user_mention_ids=(9,)), make_link(), None, chain())
+    assert parts[0].ping_users == (9,)
