@@ -1,0 +1,12 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/bot.db  # wins over an empty DATABASE_PATH= line in .env
+    volumes:
+      - data:/data  # the SQLite database lives here and survives rebuilds
+
+volumes:
+  data:

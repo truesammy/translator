@@ -25,28 +25,42 @@ original follow along. It is one-way: nothing is translated back.
 | --- | --- |
 | `DISCORD_TOKEN` | The bot token |
 | `ENCRYPTION_KEY` | Key that encrypts the servers' DeepL keys in the database |
-| `DATABASE_PATH` | SQLite file, default `data/bot.db` |
+| `DATABASE_PATH` | SQLite file. Docker sets it; without Docker the default is `data/bot.db` |
+
+Copy `.env.example` to `.env` and fill it in.
 
 Generate an `ENCRYPTION_KEY` once and keep it. Without it the stored DeepL keys cannot be read.
 
 ```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+docker run --rm python:3.12-slim sh -c "pip install -q cryptography && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
 ```
 
 ## Run
 
-With Python 3.12 or newer:
+The bot is meant to run in Docker. In the folder that holds `.env`:
 
 ```bash
-pip install .
-DISCORD_TOKEN=... ENCRYPTION_KEY=... python -m translator_bot
+docker compose up -d --build
 ```
 
-With Docker, using a `.env` file that holds the variables:
+It restarts by itself after a crash or a reboot. The database is kept in the Docker
+volume `data`, so it survives rebuilds.
+
+| Task | Command |
+| --- | --- |
+| Follow the log | `docker compose logs -f` |
+| Update after `git pull` | `docker compose up -d --build` |
+| Stop | `docker compose down` |
+| Back up the database | `docker compose cp bot:/data/bot.db ./bot.db` |
+
+### Without Docker
+
+With Python 3.12 or newer. Leave `DATABASE_PATH` empty or point it at a file.
 
 ```bash
-docker build -t translator-bot .
-docker run -d --name translator-bot --env-file .env -v translator-data:/data translator-bot
+pip install -r requirements.txt
+pip install --no-deps .
+DISCORD_TOKEN=... ENCRYPTION_KEY=... python -m translator_bot
 ```
 
 ## Commands
@@ -68,19 +82,19 @@ All commands need the **Manage Server** permission, and only you see the replies
 ## Translation order
 
 1. The official DeepL API, with the key of the server (`/apikey set`).
-2. DeepLX, an unofficial way to reach DeepL without a key.
-3. Google Translate, through an unofficial endpoint.
+2. Google Translate, through an unofficial endpoint.
 
 A server without a key starts at step 2. If a step fails, runs out of quota, cannot handle
 the language or damages a mention or link, the next one is tried. If all fail, nothing is
 posted in that channel, the original gets a ⚠️ reaction, and the reason is written to the
-bot's log output.
+bot's log output. The bot tries such a message again after its next restart, and right
+after a DeepL key is saved with `/apikey set`.
 
 ## Good to know
 
-- Message text is sent to DeepL and, on the fallbacks, to unofficial DeepL and Google
-  endpoints. Those two are not covered by the services' terms, block addresses quickly
-  and can stop working at any time. For dependable translations, set a DeepL key.
+- Message text is sent to DeepL and, on the fallback, to an unofficial Google endpoint.
+  That one is not covered by Google's terms, blocks addresses quickly and can stop
+  working at any time. For dependable translations, set a DeepL key.
 - A translation pings only what pinged in the original. `@everyone` written by someone
   who may not mention everyone stays plain text in every channel.
 - Link previews are not copied. Discord creates them again in the target channel.
@@ -91,6 +105,7 @@ bot's log output.
 ## Develop
 
 ```bash
+pip install -r requirements.txt
 pip install -e ".[dev]"
 python -m pytest
 python scripts/smoke_providers.py   # live check of the providers, makes network calls
