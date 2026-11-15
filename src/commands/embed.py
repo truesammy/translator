@@ -8,7 +8,6 @@ from discord import app_commands
 
 from ..discord_io import data_to_embed, embed_to_data, sanitize_username, snapshot
 from ..models import EmbedData
-from ..splitting import truncate
 
 if TYPE_CHECKING:
     from ..bot import TranslatorBot
@@ -50,17 +49,17 @@ def parse_message_ref(text: str) -> int:
     return int(match.group(1))
 
 
-# shortcut: a footer the admin wrote that itself contains "Edited by" is cut there on the next edit
-_EDITOR_LINE = re.compile(r"(?:^| · )Edited by .*$")
+_EDITOR_LINE = re.compile(r"\n\nEdited by <@\d+>$")
 
 
-def with_editor(footer: str | None, name: str) -> str:
-    """The footer of an edited embed names who edited it last."""
-    return f"{footer} · Edited by {name}" if footer else f"Edited by {name}"
+def with_editor(text: str, user_id: int) -> str:
+    """The text of an edited embed ends with a mention of who edited it last.
+    A mention survives translation unchanged, and inside an embed it pings nobody."""
+    return f"{text}\n\nEdited by <@{user_id}>"
 
 
-def without_editor(footer: str | None) -> str | None:
-    return _EDITOR_LINE.sub("", footer or "") or None
+def without_editor(text: str | None) -> str | None:
+    return _EDITOR_LINE.sub("", text) if text else text
 
 
 def build_embed(title: str, description: str, color: str, image_url: str, footer: str) -> EmbedData:
@@ -151,7 +150,7 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
             sent = await webhook.send(
                 embed=data_to_embed(data), username=sanitize_username(name), avatar_url=avatar, wait=True
             )
-            await bot.store.record_own_embed(sent.id, submitted.guild_id, channel.id, submitted.user.id)
+            await bot.store.record_own_embed(sent.id, submitted.guild_id, channel.id)
             # Read it back so the stored hash matches what later edit events and catch-up will see.
             message = await channel.fetch_message(sent.id)
             source = replace(snapshot(message, own_webhook_ids=set()), author_name=name, author_avatar_url=avatar)
@@ -171,7 +170,7 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
         except EmbedInputError as error:
             return await refuse(str(error))
         own = await bot.store.get_own_embed(message_id)
-        channel = interaction.guild.get_channel(own[0]) if own else None
+        channel = interaction.guild.get_channel(own) if own else None
         if channel is None:
             return await refuse("That message was not created with /embed.")
         try:
@@ -182,9 +181,8 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
             return await refuse("That message has no embed any more.")
 
         async def save(submitted: discord.Interaction, data: EmbedData) -> None:
-            # Discord cannot rename a posted message, so the editor is named in the footer.
-            footer = truncate(with_editor(data.footer_text, submitted.user.display_name), 2048)
-            data = replace(data, footer_text=footer)
+            # Discord cannot rename a posted message, so the editor is mentioned in the text.
+            data = replace(data, description=with_editor(data.description, submitted.user.id))
             webhook = await bot.poster.ensure_webhook(channel)
             await webhook.edit_message(message_id, embed=data_to_embed(data))
             edited = await channel.fetch_message(message_id)
@@ -192,7 +190,7 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
             await submitted.followup.send("Embed updated.", ephemeral=True)
 
         current = embed_to_data(original.embeds[0])
-        current = replace(current, footer_text=without_editor(current.footer_text))
+        current = replace(current, description=without_editor(current.description))
         await interaction.response.send_modal(EmbedModal("Edit embed", save, current))
 
     bot.tree.add_command(embed)

@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
     webhook_id INTEGER NOT NULL, token TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS own_embeds (
     message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL,
-    channel_id INTEGER NOT NULL, author_id INTEGER NOT NULL);
+    channel_id INTEGER NOT NULL);
 """
 TABLES = ("links", "source_channels", "guilds", "sources", "parts", "webhooks", "own_embeds")
 LINK_COLUMNS = "guild_id, source_id, target_id, language, role_id"
@@ -43,6 +43,10 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         db = await aiosqlite.connect(path)
         await db.executescript(SCHEMA)
+        # Databases from before this column was removed still have it, and it is NOT NULL.
+        columns = await (await db.execute("PRAGMA table_info(own_embeds)")).fetchall()
+        if any(column[1] == "author_id" for column in columns):
+            await db.execute("ALTER TABLE own_embeds DROP COLUMN author_id")
         await db.commit()
         return cls(db)
 
@@ -215,12 +219,12 @@ class Store:
 
     # embeds created with /embed
 
-    async def record_own_embed(self, msg_id: int, guild_id: int, channel_id: int, author_id: int) -> None:
+    async def record_own_embed(self, msg_id: int, guild_id: int, channel_id: int) -> None:
         await self._write(
-            "INSERT OR REPLACE INTO own_embeds (message_id, guild_id, channel_id, author_id) VALUES (?, ?, ?, ?)",
-            (msg_id, guild_id, channel_id, author_id),
+            "INSERT OR REPLACE INTO own_embeds (message_id, guild_id, channel_id) VALUES (?, ?, ?)",
+            (msg_id, guild_id, channel_id),
         )
 
-    async def get_own_embed(self, msg_id: int) -> tuple[int, int] | None:
-        rows = await self._rows("SELECT channel_id, author_id FROM own_embeds WHERE message_id = ?", (msg_id,))
-        return rows[0] if rows else None
+    async def get_own_embed(self, msg_id: int) -> int | None:
+        """Channel of an embed made with /embed create."""
+        return await self._value("SELECT channel_id FROM own_embeds WHERE message_id = ?", (msg_id,))

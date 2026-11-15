@@ -93,8 +93,6 @@ async def test_embed_modal_reports_discord_errors_instead_of_hanging():
 
 
 def test_editor_line_is_added_and_removed_again():
-    assert with_editor(None, "Mika") == "Edited by Mika"
-    assert with_editor("v2", "Mika") == "v2 · Edited by Mika"
-    assert without_editor("v2 · Edited by Mika") == "v2"
-    assert without_editor("Edited by Mika") is None
-    assert without_editor("v2") == "v2" and without_editor(None) is None
+    assert with_editor("Hello", 42) == "Hello\n\nEdited by <@42>"
+    assert without_editor("Hello\n\nEdited by <@42>") == "Hello"
+    assert without_editor("Hello") == "Hello" and without_editor(None) is None

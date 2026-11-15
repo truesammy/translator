@@ -77,7 +77,7 @@ All commands need the **Manage Server** permission, and only you see the replies
 | `/apikey remove` | Remove it. |
 | `/apikey status` | Show whether a key is set and how many characters are used. |
 | `/embed create channel` | Fill in a form and post an embed in a source channel. It is translated like any message. |
-| `/embed edit message` | Change an embed made with `/embed create`. Its footer then names who edited it last. Deleting it removes its translations. |
+| `/embed edit message` | Change an embed made with `/embed create`. Its text then ends with a mention of who edited it last. Deleting it removes its translations. |
 
 ## Translation order
 
