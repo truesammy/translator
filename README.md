@@ -37,19 +37,24 @@ docker run --rm python:3.12-slim sh -c "pip install -q cryptography && python -c
 
 ## Run
 
-The bot is meant to run in Docker. In the folder that holds `.env`:
+The bot is meant to run in Docker. You do not build the image yourself: GitHub Actions
+tests every push to `main` and publishes the image as `ghcr.io/truesammy/translator:latest`.
+All you need on the server is `compose.yaml` and `.env` in one folder:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
+While the image is private, log in once first with a GitHub token that may read packages:
+`docker login ghcr.io`.
+
 It restarts by itself after a crash or a reboot. The database is kept in the Docker
-volume `data`, so it survives rebuilds.
+volume `data`, so it survives updates.
 
 | Task | Command |
 | --- | --- |
 | Follow the log | `docker compose logs -f` |
-| Update after `git pull` | `docker compose up -d --build` |
+| Update to the newest image | `docker compose pull && docker compose up -d` |
 | Stop | `docker compose down` |
 | Back up the database | `docker compose cp bot:/data/bot.db ./bot.db` |
 

@@ -1,6 +1,6 @@
 services:
   bot:
-    build: .
+    image: ghcr.io/truesammy/translator:latest  # built by GitHub Actions on every push to main
     restart: unless-stopped
     env_file: .env
     environment:
