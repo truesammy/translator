@@ -150,7 +150,7 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
             sent = await webhook.send(
                 embed=data_to_embed(data), username=sanitize_username(name), avatar_url=avatar, wait=True
             )
-            await bot.store.record_own_embed(sent.id, submitted.guild_id, channel.id)
+            await bot.store.record_own_embed(sent.id, submitted.guild_id, channel.id, submitted.user.id)
             # Read it back so the stored hash matches what later edit events and catch-up will see.
             message = await channel.fetch_message(sent.id)
             source = replace(snapshot(message, own_webhook_ids=set()), author_name=name, author_avatar_url=avatar)
@@ -170,7 +170,7 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
         except EmbedInputError as error:
             return await refuse(str(error))
         own = await bot.store.get_own_embed(message_id)
-        channel = interaction.guild.get_channel(own) if own else None
+        channel = interaction.guild.get_channel(own[0]) if own else None
         if channel is None:
             return await refuse("That message was not created with /embed.")
         try:
@@ -181,8 +181,9 @@ def register_embed_commands(bot: "TranslatorBot") -> None:
             return await refuse("That message has no embed any more.")
 
         async def save(submitted: discord.Interaction, data: EmbedData) -> None:
-            # Discord cannot rename a posted message, so the editor is mentioned in the text.
-            data = replace(data, description=with_editor(data.description, submitted.user.id))
+            # Discord cannot rename a posted message, so an editor other than its author is mentioned in the text.
+            if submitted.user.id != own[1]:
+                data = replace(data, description=with_editor(data.description, submitted.user.id))
             webhook = await bot.poster.ensure_webhook(channel)
             await webhook.edit_message(message_id, embed=data_to_embed(data))
             edited = await channel.fetch_message(message_id)

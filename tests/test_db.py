@@ -123,8 +123,8 @@ async def test_webhooks(store):
 
 async def test_own_embeds(store):
     assert await store.get_own_embed(1) is None
-    await store.record_own_embed(1, 1, 100)
-    assert await store.get_own_embed(1) == 100
+    await store.record_own_embed(1, 1, 100, 42)
+    assert await store.get_own_embed(1) == (100, 42)
 
 
 async def test_delete_guild_removes_everything(store):
@@ -136,7 +136,7 @@ async def test_delete_guild_removes_everything(store):
         await store.record_source(base + 5, g, base, "h")
         await store.set_parts(base + 5, base + 1, [base + 6])
         await store.set_webhook(g, base + 1, base + 7, "t")
-        await store.record_own_embed(base + 8, g, base)
+        await store.record_own_embed(base + 8, g, base, 42)
     await store.delete_guild(1)
     assert await store.links_for_guild(1) == []
     assert await store.get_source_language(1000) is None
@@ -150,7 +150,7 @@ async def test_delete_guild_removes_everything(store):
     assert await store.get_deepl_key(2) == b"k"
     assert await store.all_parts(2005) == {2001: [2006]}
     assert await store.get_webhook(2001) == (2007, "t")
-    assert await store.get_own_embed(2008) == 2000
+    assert await store.get_own_embed(2008) == (2000, 42)
 
 
 async def test_schema_survives_reopen(tmp_path):
@@ -171,16 +171,16 @@ async def test_guild_ids_and_all_links(store):
     assert len(await store.all_links()) == 2
 
 
-async def test_old_database_loses_the_unused_author_column(tmp_path):
+async def test_database_without_the_author_column_gets_it(tmp_path):
     path = tmp_path / "old.db"
     async with aiosqlite.connect(path) as db:
         await db.execute(
             "CREATE TABLE own_embeds (message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, "
-            "channel_id INTEGER NOT NULL, author_id INTEGER NOT NULL)"
+            "channel_id INTEGER NOT NULL)"
         )
-        await db.execute("INSERT INTO own_embeds VALUES (1, 1, 100, 42)")
+        await db.execute("INSERT INTO own_embeds VALUES (1, 1, 100)")
         await db.commit()
     store = await Store.open(path)
-    await store.record_own_embed(2, 1, 100)
-    assert await store.get_own_embed(1) == 100 and await store.get_own_embed(2) == 100
+    await store.record_own_embed(2, 1, 100, 42)
+    assert await store.get_own_embed(1) == (100, None) and await store.get_own_embed(2) == (100, 42)
     await store.close()

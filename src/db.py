@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
     webhook_id INTEGER NOT NULL, token TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS own_embeds (
     message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL,
-    channel_id INTEGER NOT NULL);
+    channel_id INTEGER NOT NULL, author_id INTEGER);
 """
 TABLES = ("links", "source_channels", "guilds", "sources", "parts", "webhooks", "own_embeds")
 LINK_COLUMNS = "guild_id, source_id, target_id, language, role_id"
@@ -43,10 +43,10 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         db = await aiosqlite.connect(path)
         await db.executescript(SCHEMA)
-        # Databases from before this column was removed still have it, and it is NOT NULL.
+        # Some databases were created while this column did not exist.
         columns = await (await db.execute("PRAGMA table_info(own_embeds)")).fetchall()
-        if any(column[1] == "author_id" for column in columns):
-            await db.execute("ALTER TABLE own_embeds DROP COLUMN author_id")
+        if not any(column[1] == "author_id" for column in columns):
+            await db.execute("ALTER TABLE own_embeds ADD COLUMN author_id INTEGER")
         await db.commit()
         return cls(db)
 
@@ -219,12 +219,13 @@ class Store:
 
     # embeds created with /embed
 
-    async def record_own_embed(self, msg_id: int, guild_id: int, channel_id: int) -> None:
+    async def record_own_embed(self, msg_id: int, guild_id: int, channel_id: int, author_id: int) -> None:
         await self._write(
-            "INSERT OR REPLACE INTO own_embeds (message_id, guild_id, channel_id) VALUES (?, ?, ?)",
-            (msg_id, guild_id, channel_id),
+            "INSERT OR REPLACE INTO own_embeds (message_id, guild_id, channel_id, author_id) VALUES (?, ?, ?, ?)",
+            (msg_id, guild_id, channel_id, author_id),
         )
 
-    async def get_own_embed(self, msg_id: int) -> int | None:
-        """Channel of an embed made with /embed create."""
-        return await self._value("SELECT channel_id FROM own_embeds WHERE message_id = ?", (msg_id,))
+    async def get_own_embed(self, msg_id: int) -> tuple[int, int | None] | None:
+        """(channel, who created it) of an embed made with /embed create. The creator of old embeds is unknown."""
+        rows = await self._rows("SELECT channel_id, author_id FROM own_embeds WHERE message_id = ?", (msg_id,))
+        return rows[0] if rows else None
