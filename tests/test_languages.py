@@ -26,3 +26,7 @@ def test_search_limit():
 
 def test_unknown_code():
     assert get_language("xx-nope") is None
+
+
+def test_norwegian_uses_deepls_own_code():
+    assert deepl_code(get_language("no")) == "NB"

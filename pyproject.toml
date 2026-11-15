@@ -12,19 +12,18 @@ dependencies = [
     "aiosqlite",
     "cryptography",
     "deepl",
-    "PyDeepLX",
-    "httpx<0.28",  # PyDeepLX 1.0.7 passes `proxies`, which httpx 0.28 removed
     "deep-translator",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+# The package is named translator_bot, its files live directly in src/.
+package-dir = {translator_bot = "src"}
+packages = ["translator_bot", "translator_bot.commands", "translator_bot.providers"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-pythonpath = ["src"]
 testpaths = ["tests"]

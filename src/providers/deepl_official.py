@@ -33,7 +33,8 @@ class DeepLOfficial:
                 self._client.translate_text,
                 [xml_escape(text) for text in texts],
                 target_lang=deepl_code(target),
-                source_lang=source.code.split("-")[0].upper() if source else None,
+                # source codes have no regional variant: EN, not EN-US
+                source_lang=deepl_code(source).split("-")[0] if source else None,
                 tag_handling="xml",
                 preserve_formatting=True,
             )

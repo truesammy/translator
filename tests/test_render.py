@@ -145,3 +145,18 @@ def test_content_hash_ignores_attachment_url_signatures():
     a = make_msg(attachments=(Attachment("a.png", "https://cdn/a.png?ex=1", 10),))
     b = make_msg(attachments=(Attachment("a.png", "https://cdn/a.png?ex=2", 10),))
     assert content_hash(a) == content_hash(b)
+
+
+async def test_embeds_of_one_message_share_the_6000_limit():
+    embeds = (make_embed(description="a" * 2998), make_embed(description="b" * 2998))
+    (part,) = await render(make_msg(content="", embeds=embeds), make_link(), None, chain())
+    assert sum(len(embed.description) for embed in part.embeds) <= 6000
+
+
+def test_hash_ignores_the_signature_of_discord_image_links():
+    def msg(signature):
+        url = f"https://cdn.discordapp.com/attachments/1/2/a.png?ex={signature}&hm=1"
+        return make_msg(embeds=(make_embed(image_url=url),))
+
+    assert content_hash(msg("aa")) == content_hash(msg("bb"))
+    assert content_hash(make_msg(content="a?b")) != content_hash(make_msg(content="a?c"))

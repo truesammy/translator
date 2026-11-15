@@ -1,4 +1,5 @@
 import hashlib
+import re
 from dataclasses import replace
 
 from .chain import TranslatorChain
@@ -8,12 +9,14 @@ from .protect import mask, unmask
 from .splitting import split_text, truncate
 
 TITLE, DESCRIPTION, FIELD_NAME, FIELD_VALUE, FOOTER, AUTHOR, EMBED_TOTAL = 256, 4096, 256, 1024, 2048, 256, 6000
+_CDN_SIGNATURE = re.compile(r"(https://(?:cdn|media)\.discordapp\.(?:com|net)/[^\s'?]*)\?[^\s']*")
 
 
 def content_hash(msg: SourceMessage) -> str:
     # Attachment urls carry signatures that change on every fetch, so they stay out of the hash.
+    # The same goes for Discord's own image links inside embeds.
     identity = (msg.content, msg.embeds, tuple((a.filename, a.size) for a in msg.attachments))
-    return hashlib.sha256(repr(identity).encode()).hexdigest()
+    return hashlib.sha256(_CDN_SIGNATURE.sub(r"\1", repr(identity)).encode()).hexdigest()
 
 
 def _embed_texts(embed: EmbedData) -> list[str | None]:
@@ -27,8 +30,10 @@ def _embed_length(embed: EmbedData) -> int:
     return sum(len(text or "") for text in _embed_texts(embed))
 
 
-def _rebuild_embed(embed: EmbedData, texts) -> EmbedData:
-    """Same embed with its texts replaced by the next values from `texts`, cut to Discord's limits."""
+def _rebuild_embed(embed: EmbedData, texts, room: int) -> EmbedData:
+    """Same embed with its texts replaced by the next values from `texts`, cut to Discord's limits.
+    `room` is what is left of the 6000 characters all embeds of one message share."""
+    # shortcut: titles and footers are never cut for `room`, handle them if tiny budgets ever occur
 
     def take(original: str | None, limit: int) -> str | None:
         value = next(texts)
@@ -44,10 +49,10 @@ def _rebuild_embed(embed: EmbedData, texts) -> EmbedData:
             EmbedField(take(f.name, FIELD_NAME), take(f.value, FIELD_VALUE), f.inline) for f in embed.fields
         ),
     )
-    excess = _embed_length(result) - EMBED_TOTAL
+    excess = _embed_length(result) - room
     if excess > 0 and result.description:
         result = replace(result, description=truncate(result.description, max(1, len(result.description) - excess)))
-    while _embed_length(result) > EMBED_TOTAL and result.fields:
+    while _embed_length(result) > room and result.fields:
         result = replace(result, fields=result.fields[:-1])
     return result
 
@@ -80,7 +85,9 @@ async def render(
         ]
     )
     content = next(restored)
-    embeds = tuple(_rebuild_embed(embed, restored) for embed in msg.embeds)
+    embeds: tuple[EmbedData, ...] = ()
+    for embed in msg.embeds:
+        embeds += (_rebuild_embed(embed, restored, EMBED_TOTAL - sum(map(_embed_length, embeds))),)
 
     chunks = split_text(content) or [""]
     last = len(chunks) - 1

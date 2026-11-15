@@ -13,7 +13,7 @@ LANGUAGES: dict[str, Language] = {
     code: Language(code, name.title()) for name, code in GOOGLE_LANGUAGES_TO_CODES.items()
 }
 
-_DEEPL_CODES = {"en": "EN-US", "pt": "PT-BR", "zh-CN": "ZH-HANS", "zh-TW": "ZH-HANT"}
+_DEEPL_CODES = {"en": "EN-US", "pt": "PT-BR", "zh-CN": "ZH-HANS", "zh-TW": "ZH-HANT", "no": "NB"}
 
 
 def get_language(code: str) -> Language | None:

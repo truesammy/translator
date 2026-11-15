@@ -11,11 +11,12 @@ from .models import Attachment, EmbedData, EmbedField, OutgoingPart, SourceMessa
 from .relay import MessageGone
 
 WEBHOOK_NAME = "Translator"
-_RESERVED = re.compile(r"discord|clyde", re.IGNORECASE)
+_RESERVED = re.compile(r"discord|clyde|^everyone$|^here$", re.IGNORECASE)
 
 
 def sanitize_username(name: str) -> str:
-    """Discord rejects webhook names that are empty, too long, or contain "discord" or "clyde"."""
+    """Discord rejects webhook names that are empty, too long, contain "discord" or "clyde",
+    or are exactly "everyone" or "here"."""
     broken = _RESERVED.sub(lambda match: match.group(0)[0] + "​" + match.group(0)[1:], name.strip())
     return broken[:80].strip() or "Unknown"
 

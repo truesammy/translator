@@ -70,6 +70,7 @@ class KeyModal(discord.ui.Modal, title="DeepL API key"):
             await interaction.followup.send("DeepL rejected that key. Nothing was saved.", ephemeral=True)
             return
         await self.bot.store.set_deepl_key(interaction.guild_id, encrypt(self.bot.config.fernet_key, key))
+        self.bot.start_catch_up()  # messages that failed without a key get their translation now
         await interaction.followup.send(
             f"DeepL key saved. {used:,} of {limit:,} characters used this period.", ephemeral=True
         )

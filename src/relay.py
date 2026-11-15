@@ -37,6 +37,8 @@ class Relay:
         self._poster = poster
         self._chain_for = chain_for
         self._locks: dict[int, tuple[asyncio.Lock, int]] = {}
+        # Few targets at a time: free translators throttle bursts, and every target holds its attachments in memory.
+        self._slots = asyncio.Semaphore(3)
 
     @asynccontextmanager
     async def _locked(self, msg_id: int):
@@ -103,16 +105,24 @@ class Relay:
     async def _sync(self, msg: SourceMessage, links: list[Link], *, notify: bool) -> None:
         chain = await self._chain_for(msg.guild_id)
         source_language = await self._store.get_source_language(msg.channel_id)
-        translated = await asyncio.gather(
+        done = await asyncio.gather(
             *(self._sync_link(msg, link, source_language, chain, notify) for link in links)
         )
-        if not all(translated):
+        if not all(done):
+            # An empty hash never matches, so the next catch-up tries this message again.
+            await self._store.record_source(msg.id, msg.guild_id, msg.channel_id, "")
             await self._poster.mark_failed(msg)
 
     async def _sync_link(
         self, msg: SourceMessage, link: Link, source_language: str | None, chain: TranslatorChain, notify: bool
     ) -> bool:
-        """Bring one target channel up to date. False when no provider could translate."""
+        """Bring one target channel up to date. False when it could not be translated or posted."""
+        async with self._slots:
+            return await self._sync_link_now(msg, link, source_language, chain, notify)
+
+    async def _sync_link_now(
+        self, msg: SourceMessage, link: Link, source_language: str | None, chain: TranslatorChain, notify: bool
+    ) -> bool:
         target = link.target_channel_id
         try:
             parts = await render(msg, link, source_language, chain)
@@ -123,10 +133,11 @@ class Relay:
             return False
         except Exception as error:
             log.warning("Could not post to channel %s: %s", target, error)
-            return True
+            return False
 
         existing = await self._store.get_parts(msg.id, target)
         posted: list[int] = []
+        ok = True
         try:
             for i, part in enumerate(parts):
                 if i < len(existing):
@@ -144,5 +155,6 @@ class Relay:
         except Exception as error:
             log.warning("Could not post to channel %s: %s", target, error)
             posted += existing[len(posted) :]  # keep tracking what is still there
+            ok = False
         await self._store.set_parts(msg.id, target, posted)
-        return True
+        return ok

@@ -5,7 +5,6 @@ from .languages import Language
 from .protect import has_translatable_text, intact
 from .providers.base import TranslationError, Translator
 from .providers.deepl_official import DeepLOfficial
-from .providers.deeplx import DeepLX
 from .providers.google_free import GoogleFree
 
 
@@ -52,5 +51,4 @@ class TranslatorChain:
 
 
 def build_chain(deepl_key: str | None) -> TranslatorChain:
-    fallbacks: list[Translator] = [DeepLX(), GoogleFree()]
-    return TranslatorChain([DeepLOfficial(deepl_key), *fallbacks] if deepl_key else fallbacks)
+    return TranslatorChain([DeepLOfficial(deepl_key), GoogleFree()] if deepl_key else [GoogleFree()])

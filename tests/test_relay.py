@@ -186,3 +186,41 @@ async def test_real_pings_are_passed_on_and_edits_never_ping(env):
     await env.relay.handle_create(msg)
     pings = {channel: part.ping_roles for channel, _, part in env.poster.sent}
     assert pings == {201: (7,), 202: (7, 5)}
+
+
+async def test_failed_translation_is_retried_by_the_next_catch_up(env):
+    env.providers[0].fail = "down"
+    msg = make_msg(id=1, channel_id=100, content="hi")
+    await env.relay.handle_create(msg)
+    assert env.poster.sent == [] and env.poster.failed == [1]
+    env.providers[0].fail = None
+    await env.relay.handle_edit(msg)  # what catch-up calls for every tracked message
+    assert len(env.poster.sent) == 2
+
+
+async def test_failed_post_is_marked_and_retried(env):
+    env.poster.fail_channels = {201}
+    msg = make_msg(id=1, channel_id=100, content="hi")
+    await env.relay.handle_create(msg)
+    assert env.poster.failed == [1]
+    env.poster.fail_channels = set()
+    await env.relay.handle_edit(msg)
+    assert {channel for channel, _, _ in env.poster.sent} == {201, 202}
+
+
+async def test_at_most_three_targets_are_synced_at_once(env):
+    for target in range(203, 210):
+        await env.store.add_link(Link(1, 100, target, "de", None))
+    running = peak = 0
+
+    async def slow(texts, target, source):
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        return texts
+
+    env.providers[0].translate = slow
+    await env.relay.handle_create(make_msg(id=1, channel_id=100, content="hi"))
+    assert peak == 3 and len(env.poster.sent) == 9

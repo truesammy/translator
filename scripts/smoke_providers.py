@@ -1,19 +1,15 @@
 """Manual check that the real providers keep placeholders intact. Makes network calls.
 
-Usage: python scripts/smoke_providers.py        (set DEEPL_KEY to include the official API)
+Usage: python scripts/smoke_providers.py   (needs the package installed; set DEEPL_KEY to include the official API)
 """
 
 import asyncio
 import os
-import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-
-from translator_bot.languages import get_language  # noqa: E402
-from translator_bot.protect import intact, mask, unmask  # noqa: E402
-from translator_bot.providers.deepl_official import DeepLOfficial  # noqa: E402
-from translator_bot.providers.deeplx import DeepLX  # noqa: E402
-from translator_bot.providers.google_free import GoogleFree  # noqa: E402
+from translator_bot.languages import get_language
+from translator_bot.protect import intact, mask, unmask
+from translator_bot.providers.deepl_official import DeepLOfficial
+from translator_bot.providers.google_free import GoogleFree
 
 SAMPLE = (
     "# Server update\n"
@@ -23,7 +19,7 @@ SAMPLE = (
 
 
 async def main() -> None:
-    providers = [DeepLX(), GoogleFree()]
+    providers = [GoogleFree()]
     if os.environ.get("DEEPL_KEY"):
         providers.insert(0, DeepLOfficial(os.environ["DEEPL_KEY"]))
     masked, spans = mask(SAMPLE)

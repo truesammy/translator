@@ -38,7 +38,7 @@ async def test_undecryptable_key_falls_back_to_the_free_providers(tmp_path, capl
     bot.store = await Store.open(":memory:")
     await bot.store.set_deepl_key(1, b"not encrypted with this key")
     chain = await bot.chain_for(1)
-    assert [p.name for p in chain._providers] == ["deeplx", "google"]
+    assert [p.name for p in chain._providers] == ["google"]
     assert "cannot be decrypted" in caplog.text
     await bot.close()
 

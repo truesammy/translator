@@ -71,8 +71,8 @@ async def test_nothing_translatable_calls_no_provider():
 
 
 def test_build_chain_order():
-    assert [p.name for p in build_chain("k:fx")._providers] == ["deepl", "deeplx", "google"]
-    assert [p.name for p in build_chain(None)._providers] == ["deeplx", "google"]
+    assert [p.name for p in build_chain("k:fx")._providers] == ["deepl", "google"]
+    assert [p.name for p in build_chain(None)._providers] == ["google"]
 
 
 class Hanging(FakeTranslator):

@@ -84,3 +84,8 @@ def test_snapshot_records_what_really_pinged():
     message = fake_message(mention_everyone=True, role_mentions=[SimpleNamespace(id=7)])
     msg = snapshot(message, own_webhook_ids=set())
     assert msg.mention_everyone and msg.role_mention_ids == (7,)
+
+
+@pytest.mark.parametrize("raw", ["everyone", "Here"])
+def test_sanitize_username_breaks_forbidden_names(raw):
+    assert sanitize_username(raw).lower() != raw.lower()
