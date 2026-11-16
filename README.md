@@ -45,9 +45,6 @@ All you need on the server is `compose.yaml` and `.env` in one folder:
 docker compose up -d
 ```
 
-While the image is private, log in once first with a GitHub token that may read packages:
-`docker login ghcr.io`.
-
 It restarts by itself after a crash or a reboot. The database is kept in the Docker
 volume `data`, so it survives updates.
 
