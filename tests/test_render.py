@@ -165,3 +165,9 @@ def test_hash_ignores_the_signature_of_discord_image_links():
 async def test_only_users_that_pinged_in_the_original_ping_again():
     parts = await render(make_msg(content="<@9> and <@8>", user_mention_ids=(9,)), make_link(), None, chain())
     assert parts[0].ping_users == (9,)
+
+
+async def test_original_link_copies_without_translating():
+    translator = FakeTranslator("a")
+    parts = await render(make_msg(content="hi @everyone"), make_link("original"), None, TranslatorChain([translator]))
+    assert translator.calls == [] and parts[0].content == "hi @everyone"

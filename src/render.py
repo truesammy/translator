@@ -3,7 +3,7 @@ import re
 from dataclasses import replace
 
 from .chain import TranslatorChain
-from .languages import get_language
+from .languages import ORIGINAL, get_language
 from .models import EmbedData, EmbedField, Link, OutgoingPart, SourceMessage
 from .protect import mask, unmask
 from .splitting import split_text, truncate
@@ -66,7 +66,7 @@ async def render(
     raw = [msg.content] + [text or "" for embed in msg.embeds for text in _embed_texts(embed)]
     masked = [mask(text) for text in raw]
     texts = [text for text, _ in masked]
-    if source_language != link.language:
+    if link.language not in (source_language, ORIGINAL):
         target = get_language(link.language)
         if target is None:
             raise ValueError(f"unknown language code {link.language!r}")

@@ -5,7 +5,7 @@ import discord
 from discord import app_commands
 
 from ..crypto import decrypt, encrypt
-from ..languages import get_language, search_languages
+from ..languages import ORIGINAL, get_language, language_name, search_languages
 from ..models import Link
 from ..providers.deepl_official import DeepLOfficial
 from ..splitting import truncate
@@ -23,6 +23,7 @@ TARGET_PERMISSIONS = {
     "attach_files": "Attach Files",
 }
 AUTO = ("Detect automatically", "auto")
+ORIGINAL_CHOICE = ("Original (no translation)", ORIGINAL)
 
 _background: set[asyncio.Task] = set()  # keeps running cleanups from being garbage collected
 
@@ -31,11 +32,12 @@ def missing_target_permissions(perms: discord.Permissions) -> list[str]:
     return [label for name, label in TARGET_PERMISSIONS.items() if not getattr(perms, name)]
 
 
-def language_choices(current: str, *, with_auto: bool = False) -> list[tuple[str, str]]:
+def language_choices(current: str, *, with_auto: bool = False, with_original: bool = False) -> list[tuple[str, str]]:
     """(label, value) pairs for autocomplete, at most 25 as Discord allows."""
     choices = [(f"{lang.name} ({lang.code})", lang.code) for lang in search_languages(current)]
-    if with_auto and current.strip().lower() in AUTO[0].lower() + " auto":
-        choices.insert(0, AUTO)
+    for wanted, extra in ((with_auto, AUTO), (with_original, ORIGINAL_CHOICE)):
+        if wanted and current.strip().lower() in f"{extra[0]} {extra[1]}".lower():
+            choices.insert(0, extra)
     return choices[:25]
 
 
@@ -49,7 +51,7 @@ def format_links(links: list[Link], source_languages: dict[int, str | None]) -> 
         for link in sorted(links, key=lambda link: link.target_channel_id):
             if link.source_channel_id == source_id:
                 ping = f", pings <@&{link.role_id}>" if link.role_id else ""
-                lines.append(f"→ <#{link.target_channel_id}> {get_language(link.language).name}{ping}")
+                lines.append(f"→ <#{link.target_channel_id}> {language_name(link.language)}{ping}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
@@ -81,7 +83,8 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
         await interaction.response.send_message(text, ephemeral=True)
 
     async def language_autocomplete(interaction: discord.Interaction, current: str):
-        return [app_commands.Choice(name=name, value=value) for name, value in language_choices(current)]
+        choices = language_choices(current, with_original=True)
+        return [app_commands.Choice(name=name, value=value) for name, value in choices]
 
     async def source_language_autocomplete(interaction: discord.Interaction, current: str):
         choices = language_choices(current, with_auto=True)
@@ -106,8 +109,7 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
         language: str,
         role: discord.Role | None = None,
     ) -> None:
-        lang = get_language(language)
-        if lang is None:
+        if language != ORIGINAL and get_language(language) is None:
             return await reply(interaction, "Unknown language. Pick one from the list.")
         if source.id == target.id:
             return await reply(interaction, "Source and target must be different channels.")
@@ -132,13 +134,13 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
                 f"Could not create a webhook in {target.mention}: {error.text or error.status}", ephemeral=True
             )
             return
-        await bot.store.add_link(Link(interaction.guild_id, source.id, target.id, lang.code, role.id if role else None))
+        await bot.store.add_link(Link(interaction.guild_id, source.id, target.id, language, role.id if role else None))
         if await bot.store.get_last_seen(source.id) is None:
             # Catch-up starts here, so a message posted while the bot is offline is not missed.
             await bot.store.set_last_seen(interaction.guild_id, source.id, interaction.id)
         ping = f", pinging {role.mention}" if role else ""
         await interaction.followup.send(
-            f"Linked {source.mention} → {target.mention} in {lang.name}{ping}.", ephemeral=True
+            f"Linked {source.mention} → {target.mention} in {language_name(code)}{ping}.", ephemeral=True
         )
 
     @link.command(name="remove", description="Remove a link and delete its translations")

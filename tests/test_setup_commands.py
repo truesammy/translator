@@ -32,3 +32,8 @@ def test_language_choices_with_auto_first():
     choices = language_choices("", with_auto=True)
     assert choices[0] == ("Detect automatically", "auto") and len(choices) == 25
     assert language_choices("germ", with_auto=True)[0] == ("German (de)", "de")
+
+
+def test_original_is_a_link_language():
+    assert language_choices("orig", with_original=True)[0] == ("Original (no translation)", "original")
+    assert format_links([Link(1, 100, 201, "original", None)], {100: None}).endswith("→ <#201> Original")

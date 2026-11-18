@@ -13,11 +13,18 @@ LANGUAGES: dict[str, Language] = {
     code: Language(code, name.title()) for name, code in GOOGLE_LANGUAGES_TO_CODES.items()
 }
 
+# Link language that copies a message untranslated.
+ORIGINAL = "original"
+
 _DEEPL_CODES = {"en": "EN-US", "pt": "PT-BR", "zh-CN": "ZH-HANS", "zh-TW": "ZH-HANT", "no": "NB", "iw": "HE"}
 
 
 def get_language(code: str) -> Language | None:
     return LANGUAGES.get(code)
+
+
+def language_name(code: str) -> str:
+    return "Original" if code == ORIGINAL else LANGUAGES[code].name
 
 
 def deepl_code(lang: Language) -> str:
