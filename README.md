@@ -10,6 +10,8 @@ original follow along. It is one-way: nothing is translated back.
 - Posts under the original author's name and avatar.
 - Replaces `@everyone` and `@here` with the target channel's language role, if it has one.
 - Catches up after downtime: missed messages, edits and deletions of the last 30 days.
+- Or, instead of a channel per language: flag buttons under each announcement that show it,
+  translated, only to whoever presses one. Each language is translated once, on its first press.
 
 ## Set up the Discord application
 
@@ -84,6 +86,29 @@ All commands need the **Manage Server** permission, and only you see the replies
 | `/apikey status` | Show whether a key is set and how many characters are used. |
 | `/embed create channel` | Fill in a form and post an embed in a source channel. It is translated like any message. |
 | `/embed edit message` | Change an embed made with `/embed create`. If someone other than its author edits it, its text ends with a mention of who edited it last. Deleting it removes its translations. |
+| `/flags add language` | Offer a language on the flag buttons (at most 25). |
+| `/flags remove language` | Stop offering it. |
+| `/flags list` | Show the languages on the flag buttons. |
+| *Apps → Add translation flags* (right-click a message) | Reply to that one message with the flag buttons. Deleting the message deletes the reply. |
+| *Apps → Translate* (right-click a message) | Show the flag buttons for that message, only to you. |
+
+## Private translations with flags
+
+People pick their language themselves and nothing is translated before someone asks for it.
+
+1. Write the announcements in a channel only admins see, the source.
+2. `/link add source target language:Original (no translation)` copies every message, untranslated,
+   into the public channel `target`.
+3. `/flags add language` once per language. Every copy now carries a flag button per language.
+
+Pressing a flag shows the announcement in that language, visible only to whoever pressed it.
+The first press per language translates and stores the result; every later press, by anyone,
+reuses it. An edit of the announcement makes the next press translate once more. Attachments
+are not repeated in the private reply. Changing the languages updates a copy's buttons the next
+time its announcement is edited.
+
+The *Translate* menu is for admins only at first. To offer it to everyone, open
+**Server Settings → Integrations → the bot → Translate** and allow `@everyone`.
 
 ## Translation order
 

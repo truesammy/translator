@@ -2,7 +2,7 @@ name: Test and publish image
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
 
 jobs:
   test:
@@ -17,6 +17,7 @@ jobs:
 
   image:
     needs: test
+    if: github.ref == 'refs/heads/main'  # other branches are only tested
     runs-on: ubuntu-latest
     permissions:
       contents: read
