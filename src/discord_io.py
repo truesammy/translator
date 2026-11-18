@@ -7,7 +7,7 @@ import aiohttp
 import discord
 
 from .db import Store
-from .flags import flag_look
+from .flags import button_look
 from .models import Attachment, EmbedData, EmbedField, OutgoingPart, SourceMessage
 from .relay import MessageGone
 
@@ -57,14 +57,14 @@ def data_to_embed(data: EmbedData) -> discord.Embed:
     return embed
 
 
-def flag_view(custom_ids: tuple[str, ...]) -> discord.ui.View | None:
+def button_view(custom_ids: tuple[str, ...]) -> discord.ui.View | None:
     if not custom_ids:
         return None
     view = discord.ui.View(timeout=None)
     for custom_id in custom_ids:
-        emoji, label = flag_look(custom_id.rsplit(":", 1)[1])
+        emoji, label = button_look(custom_id)
         view.add_item(discord.ui.Button(custom_id=custom_id, emoji=emoji, label=label))
-    # FlagButton answers the presses. A running view would be kept in memory for every message it is sent with.
+    # TranslateButton and FlagButton answer the presses. A running view would be kept in memory for every message it is sent with.
     view.stop()
     return view
 
@@ -157,7 +157,7 @@ class DiscordPoster:
             content, files = await self._content_and_files(part, channel, upload=True)
             options = {"avatar_url": avatar_url} if avatar_url else {}
             if part.buttons:
-                options["view"] = flag_view(part.buttons)
+                options["view"] = button_view(part.buttons)
             try:
                 message = await webhook.send(
                     content,
@@ -189,7 +189,7 @@ class DiscordPoster:
                 content=content,
                 embeds=[data_to_embed(embed) for embed in part.embeds],
                 allowed_mentions=discord.AllowedMentions.none(),
-                view=flag_view(part.buttons),  # None drops buttons of a flag language list that became empty
+                view=button_view(part.buttons),
             )
         except discord.NotFound:
             # Deleted by hand, or posted by an earlier webhook that was removed.

@@ -8,7 +8,7 @@ from typing import Protocol
 
 from .chain import AllProvidersFailed, TranslatorChain
 from .db import Store
-from .flags import flag_id
+from .flags import translate_id
 from .languages import ORIGINAL, get_language
 from .models import Link, OutgoingPart, SourceMessage
 from .render import content_hash, render
@@ -141,8 +141,7 @@ class Relay:
             return False
 
         if link.language == ORIGINAL and parts:
-            codes = await self._store.flag_languages(msg.guild_id)
-            parts[-1] = replace(parts[-1], buttons=tuple(flag_id(msg.channel_id, msg.id, code) for code in codes))
+            parts[-1] = replace(parts[-1], buttons=(translate_id(msg.channel_id, msg.id),))
         existing = await self._store.get_parts(msg.id, target)
         posted: list[int] = []
         ok = True

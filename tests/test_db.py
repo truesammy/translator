@@ -187,13 +187,13 @@ async def test_database_without_the_author_column_gets_it(tmp_path):
 
 
 async def test_flag_languages(store):
-    await store.add_flag_language(1, "fr")
-    await store.add_flag_language(1, "de")
-    await store.add_flag_language(1, "de")
-    await store.add_flag_language(2, "ja")
-    assert await store.flag_languages(1) == ["de", "fr"]
+    await store.add_flag_language(1, "fr", None)
+    await store.add_flag_language(1, "de", 7)
+    await store.add_flag_language(1, "de", 8)
+    await store.add_flag_language(2, "ja", None)
+    assert await store.flag_languages(1) == [("de", 8), ("fr", None)]
     assert await store.remove_flag_language(1, "de") and not await store.remove_flag_language(1, "de")
-    assert await store.flag_languages(1) == ["fr"]
+    assert await store.flag_languages(1) == [("fr", None)]
 
 
 async def test_translations_are_cached_per_content(store):
@@ -214,7 +214,7 @@ async def test_forget_private(store):
 
 
 async def test_delete_guild_removes_flag_data(store):
-    await store.add_flag_language(1, "de")
+    await store.add_flag_language(1, "de", None)
     await store.set_translation(5, 1, "de", "h", b"x")
     await store.add_flag_reply(1, 5, 100, 6)
     await store.delete_guild(1)

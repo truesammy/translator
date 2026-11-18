@@ -18,7 +18,7 @@ async def test_all_commands_register_and_are_admin_only(tmp_path):
     register_embed_commands(bot)
     register_flag_commands(bot)
     commands = {command.name: command for command in bot.tree.get_commands()}
-    assert set(commands) == {"link", "source-language", "apikey", "embed", "flags", "Add translation flags", "Translate"}
+    assert set(commands) == {"link", "source-language", "apikey", "embed", "flags", "Add translate button", "Translate"}
     assert {c.name for c in commands["flags"].commands} == {"add", "remove", "list"}
     assert {c.name for c in commands["link"].commands} == {"add", "remove", "list"}
     assert {c.name for c in commands["apikey"].commands} == {"set", "remove", "status"}

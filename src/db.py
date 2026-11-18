@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS own_embeds (
     message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL,
     channel_id INTEGER NOT NULL, author_id INTEGER);
 CREATE TABLE IF NOT EXISTS flag_languages (
-    guild_id INTEGER NOT NULL, language TEXT NOT NULL, PRIMARY KEY (guild_id, language));
+    guild_id INTEGER NOT NULL, language TEXT NOT NULL, role_id INTEGER, PRIMARY KEY (guild_id, language));
 CREATE TABLE IF NOT EXISTS translations (
     message_id INTEGER NOT NULL, guild_id INTEGER NOT NULL, language TEXT NOT NULL,
     content_hash TEXT NOT NULL, parts BLOB NOT NULL, PRIMARY KEY (message_id, language));
@@ -243,16 +243,20 @@ class Store:
 
     # private translations behind flag buttons
 
-    async def add_flag_language(self, guild_id: int, code: str) -> None:
-        await self._write("INSERT OR IGNORE INTO flag_languages (guild_id, language) VALUES (?, ?)", (guild_id, code))
+    async def add_flag_language(self, guild_id: int, code: str, role_id: int | None) -> None:
+        await self._write(
+            "INSERT OR REPLACE INTO flag_languages (guild_id, language, role_id) VALUES (?, ?, ?)",
+            (guild_id, code, role_id),
+        )
 
     async def remove_flag_language(self, guild_id: int, code: str) -> bool:
         sql = "DELETE FROM flag_languages WHERE guild_id = ? AND language = ?"
         return await self._write(sql, (guild_id, code)) > 0
 
-    async def flag_languages(self, guild_id: int) -> list[str]:
-        rows = await self._rows("SELECT language FROM flag_languages WHERE guild_id = ? ORDER BY language", (guild_id,))
-        return [row[0] for row in rows]
+    async def flag_languages(self, guild_id: int) -> list[tuple[str, int | None]]:
+        """(language, role of the people who read it) pairs."""
+        sql = "SELECT language, role_id FROM flag_languages WHERE guild_id = ? ORDER BY language"
+        return [tuple(row) for row in await self._rows(sql, (guild_id,))]
 
     async def get_translation(self, msg_id: int, language: str, content_hash: str) -> bytes | None:
         return await self._value(

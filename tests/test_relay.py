@@ -6,7 +6,7 @@ import pytest
 from fakes import FakePoster, FakeTranslator, make_msg
 from translator_bot.chain import TranslatorChain
 from translator_bot.db import Store
-from translator_bot.flags import flag_id
+from translator_bot.flags import translate_id
 from translator_bot.languages import ORIGINAL
 from translator_bot.models import Link
 from translator_bot.relay import Relay
@@ -240,12 +240,10 @@ async def test_hash_stays_empty_until_every_target_is_done(env):
     assert await env.store.get_source_hash(1)
 
 
-async def test_original_link_carries_flag_buttons_on_its_last_part(env):
+async def test_original_link_carries_the_translate_button_on_its_last_part(env):
     await env.store.add_link(Link(1, 100, 203, ORIGINAL, None))
-    await env.store.add_flag_language(1, "fr")
-    await env.store.add_flag_language(1, "de")
     await env.relay.handle_create(make_msg(id=1, channel_id=100, content="word " * 500))
-    buttons = (flag_id(100, 1, "de"), flag_id(100, 1, "fr"))
+    buttons = (translate_id(100, 1),)
     assert [p.buttons for c, _, p in env.poster.sent if c == 203] == [(), buttons]
     assert all(p.buttons == () for c, _, p in env.poster.sent if c != 203)
     await env.relay.handle_edit(make_msg(id=1, channel_id=100, content="short"))

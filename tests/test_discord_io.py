@@ -4,8 +4,8 @@ import discord
 import pytest
 
 from translator_bot.db import Store
-from translator_bot.discord_io import DiscordPoster, data_to_embed, embed_to_data, flag_view, sanitize_username, snapshot
-from translator_bot.flags import flag_id
+from translator_bot.discord_io import DiscordPoster, button_view, data_to_embed, embed_to_data, sanitize_username, snapshot
+from translator_bot.flags import flag_id, translate_id
 from translator_bot.models import OutgoingPart
 from translator_bot.relay import MessageGone
 
@@ -147,11 +147,11 @@ async def test_edit_of_a_message_that_is_gone_raises_message_gone(poster):
         await poster.poster.edit(201, 5, PART)
 
 
-async def test_flag_view():
-    assert flag_view(()) is None
-    view = flag_view((flag_id(1, 2, "de"), flag_id(1, 2, "haw")))
+async def test_button_view():
+    assert button_view(()) is None
+    view = button_view((translate_id(1, 2), flag_id(1, 2, "haw")))
     assert [(b.custom_id, str(b.emoji) if b.emoji else None, b.label) for b in view.children] == [
-        ("flag:1:2:de", "🇩🇪", None),
+        ("translate:1:2", "🌐", "Translate"),
         ("flag:1:2:haw", None, "Hawaiian"),
     ]
     assert view.is_finished()  # not kept in memory per message

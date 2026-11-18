@@ -10,8 +10,9 @@ original follow along. It is one-way: nothing is translated back.
 - Posts under the original author's name and avatar.
 - Replaces `@everyone` and `@here` with the target channel's language role, if it has one.
 - Catches up after downtime: missed messages, edits and deletions of the last 30 days.
-- Or, instead of a channel per language: flag buttons under each announcement that show it,
-  translated, only to whoever presses one. Each language is translated once, on its first press.
+- Or, instead of a channel per language: a Translate button under each announcement that shows
+  it, only to whoever presses it, in the language of their role. Each language is translated
+  once, on its first press.
 
 ## Set up the Discord application
 
@@ -86,26 +87,27 @@ All commands need the **Manage Server** permission, and only you see the replies
 | `/apikey status` | Show whether a key is set and how many characters are used. |
 | `/embed create channel` | Fill in a form and post an embed in a source channel. It is translated like any message. |
 | `/embed edit message` | Change an embed made with `/embed create`. If someone other than its author edits it, its text ends with a mention of who edited it last. Deleting it removes its translations. |
-| `/flags add language` | Offer a language on the flag buttons (at most 25). |
+| `/flags add language [role]` | Offer a language to the Translate button, for everyone with `role` (at most 25 languages). Run it again to change the role. |
 | `/flags remove language` | Stop offering it. |
-| `/flags list` | Show the languages on the flag buttons. |
-| *Apps → Add translation flags* (right-click a message) | Reply to that one message with the flag buttons. Deleting the message deletes the reply. |
-| *Apps → Translate* (right-click a message) | Show the flag buttons for that message, only to you. |
+| `/flags list` | Show the offered languages and their roles. |
+| *Apps → Add translate button* (right-click a message) | Reply to that one message with the Translate button. Deleting the message deletes the reply. |
+| *Apps → Translate* (right-click a message) | Translate that message for you, like the button does. |
 
-## Private translations with flags
+## Private translations with a Translate button
 
-People pick their language themselves and nothing is translated before someone asks for it.
+Everyone reads in their own language, and nothing is translated before someone asks for it.
 
 1. Write the announcements in a channel only admins see, the source.
 2. `/link add source target language:Original (no translation)` copies every message, untranslated,
-   into the public channel `target`.
-3. `/flags add language` once per language. Every copy now carries a flag button per language.
+   into the public channel `target`. Every copy carries a 🌐 Translate button.
+3. `/flags add language role` once per language, with the role of the people who read it,
+   e.g. `/flags add German @Deutsch`.
 
-Pressing a flag shows the announcement in that language, visible only to whoever pressed it.
+Pressing 🌐 Translate shows the announcement in the language of the presser's role, visible only
+to them. Someone with none of these roles, or with several, gets a flag per language to pick from.
 The first press per language translates and stores the result; every later press, by anyone,
 reuses it. An edit of the announcement makes the next press translate once more. Attachments
-are not repeated in the private reply. Changing the languages updates a copy's buttons the next
-time its announcement is edited.
+are not repeated in the private reply.
 
 The *Translate* menu is for admins only at first. To offer it to everyone, open
 **Server Settings → Integrations → the bot → Translate** and allow `@everyone`.
