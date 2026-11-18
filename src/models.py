@@ -68,3 +68,4 @@ class OutgoingPart:
     notify: bool
     ping_roles: tuple[int, ...] = ()  # roles this part may notify, only when `notify` is set
     ping_users: tuple[int, ...] = ()  # users this part may notify, only when `notify` is set
+    buttons: tuple[str, ...] = ()  # custom ids of flag buttons

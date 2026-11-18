@@ -1,13 +1,15 @@
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
-from contextlib import asynccontextmanager
+import pickle
+from collections.abc import Awaitable, Callable, Hashable
+from contextlib import asynccontextmanager, suppress
 from dataclasses import replace
 from typing import Protocol
 
 from .chain import AllProvidersFailed, TranslatorChain
 from .db import Store
-from .languages import get_language
+from .flags import flag_id
+from .languages import ORIGINAL, get_language
 from .models import Link, OutgoingPart, SourceMessage
 from .render import content_hash, render
 
@@ -36,24 +38,24 @@ class Relay:
         self._store = store
         self._poster = poster
         self._chain_for = chain_for
-        self._locks: dict[int, tuple[asyncio.Lock, int]] = {}
+        self._locks: dict[Hashable, tuple[asyncio.Lock, int]] = {}
         # Few targets at a time: free translators throttle bursts, and every target holds its attachments in memory.
         self._slots = asyncio.Semaphore(3)
 
     @asynccontextmanager
-    async def _locked(self, msg_id: int):
+    async def _locked(self, key: Hashable):
         # One lock per source message, so create, edit and delete never interleave.
-        lock, users = self._locks.get(msg_id, (asyncio.Lock(), 0))
-        self._locks[msg_id] = (lock, users + 1)
+        lock, users = self._locks.get(key, (asyncio.Lock(), 0))
+        self._locks[key] = (lock, users + 1)
         try:
             async with lock:
                 yield
         finally:
-            lock, users = self._locks[msg_id]
+            lock, users = self._locks[key]
             if users == 1:
-                del self._locks[msg_id]
+                del self._locks[key]
             else:
-                self._locks[msg_id] = (lock, users - 1)
+                self._locks[key] = (lock, users - 1)
 
     async def handle_create(self, msg: SourceMessage) -> None:
         async with self._locked(msg.id):
@@ -76,6 +78,8 @@ class Relay:
 
     async def handle_delete(self, source_message_id: int) -> None:
         async with self._locked(source_message_id):
+            for channel_id, reply_id in await self._store.forget_private(source_message_id):
+                await self._delete(channel_id, reply_id)
             if await self._store.get_source_hash(source_message_id) is None:
                 return
             stuck = False
@@ -136,6 +140,9 @@ class Relay:
             log.warning("Could not post to channel %s: %s", target, error)
             return False
 
+        if link.language == ORIGINAL and parts:
+            codes = await self._store.flag_languages(msg.guild_id)
+            parts[-1] = replace(parts[-1], buttons=tuple(flag_id(msg.channel_id, msg.id, code) for code in codes))
         existing = await self._store.get_parts(msg.id, target)
         posted: list[int] = []
         ok = True
@@ -159,3 +166,17 @@ class Relay:
             ok = False
         await self._store.set_parts(msg.id, target, posted)
         return ok
+
+    async def private_translation(self, msg: SourceMessage, language: str) -> list[OutgoingPart]:
+        """`msg` in `language`, translated at most once per content. Raises AllProvidersFailed."""
+        new_hash = content_hash(msg)
+        async with self._locked((msg.id, language)):  # people pressing the same new flag at once
+            cached = await self._store.get_translation(msg.id, language, new_hash)
+            if cached is not None:
+                with suppress(Exception):  # stored by a version whose models differed: translate again
+                    return pickle.loads(cached)
+            link = Link(msg.guild_id, msg.channel_id, 0, language, None)
+            source_language = await self._store.get_source_language(msg.channel_id)
+            parts = await render(msg, link, source_language, await self._chain_for(msg.guild_id))
+            await self._store.set_translation(msg.id, msg.guild_id, language, new_hash, pickle.dumps(parts))
+            return parts
