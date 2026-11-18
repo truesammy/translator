@@ -140,7 +140,7 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
             await bot.store.set_last_seen(interaction.guild_id, source.id, interaction.id)
         ping = f", pinging {role.mention}" if role else ""
         await interaction.followup.send(
-            f"Linked {source.mention} → {target.mention} in {language_name(code)}{ping}.", ephemeral=True
+            f"Linked {source.mention} → {target.mention} in {language_name(language)}{ping}.", ephemeral=True
         )
 
     @link.command(name="remove", description="Remove a link and delete its translations")
