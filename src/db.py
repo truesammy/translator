@@ -28,8 +28,19 @@ CREATE TABLE IF NOT EXISTS webhooks (
 CREATE TABLE IF NOT EXISTS own_embeds (
     message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL,
     channel_id INTEGER NOT NULL, author_id INTEGER);
+CREATE TABLE IF NOT EXISTS flag_languages (
+    guild_id INTEGER NOT NULL, language TEXT NOT NULL, PRIMARY KEY (guild_id, language));
+CREATE TABLE IF NOT EXISTS translations (
+    message_id INTEGER NOT NULL, guild_id INTEGER NOT NULL, language TEXT NOT NULL,
+    content_hash TEXT NOT NULL, parts BLOB NOT NULL, PRIMARY KEY (message_id, language));
+CREATE TABLE IF NOT EXISTS flag_replies (
+    message_id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL, reply_id INTEGER NOT NULL);
 """
-TABLES = ("links", "source_channels", "guilds", "sources", "parts", "webhooks", "own_embeds")
+TABLES = (
+    "links", "source_channels", "guilds", "sources", "parts", "webhooks", "own_embeds",
+    "flag_languages", "translations", "flag_replies",
+)
 LINK_COLUMNS = "guild_id, source_id, target_id, language, role_id"
 
 
@@ -229,3 +240,42 @@ class Store:
         """(channel, who created it) of an embed made with /embed create. The creator of old embeds is unknown."""
         rows = await self._rows("SELECT channel_id, author_id FROM own_embeds WHERE message_id = ?", (msg_id,))
         return rows[0] if rows else None
+
+    # private translations behind flag buttons
+
+    async def add_flag_language(self, guild_id: int, code: str) -> None:
+        await self._write("INSERT OR IGNORE INTO flag_languages (guild_id, language) VALUES (?, ?)", (guild_id, code))
+
+    async def remove_flag_language(self, guild_id: int, code: str) -> bool:
+        sql = "DELETE FROM flag_languages WHERE guild_id = ? AND language = ?"
+        return await self._write(sql, (guild_id, code)) > 0
+
+    async def flag_languages(self, guild_id: int) -> list[str]:
+        rows = await self._rows("SELECT language FROM flag_languages WHERE guild_id = ? ORDER BY language", (guild_id,))
+        return [row[0] for row in rows]
+
+    async def get_translation(self, msg_id: int, language: str, content_hash: str) -> bytes | None:
+        return await self._value(
+            "SELECT parts FROM translations WHERE message_id = ? AND language = ? AND content_hash = ?",
+            (msg_id, language, content_hash),
+        )
+
+    async def set_translation(self, msg_id: int, guild_id: int, language: str, content_hash: str, parts: bytes) -> None:
+        await self._write(
+            "INSERT OR REPLACE INTO translations (message_id, guild_id, language, content_hash, parts) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (msg_id, guild_id, language, content_hash, parts),
+        )
+
+    async def add_flag_reply(self, guild_id: int, msg_id: int, channel_id: int, reply_id: int) -> None:
+        await self._write(
+            "INSERT OR REPLACE INTO flag_replies (message_id, guild_id, channel_id, reply_id) VALUES (?, ?, ?, ?)",
+            (msg_id, guild_id, channel_id, reply_id),
+        )
+
+    async def forget_private(self, msg_id: int) -> list[tuple[int, int]]:
+        """Drop a message's stored translations and flag reply. Returns (channel, reply) of the reply."""
+        replies = await self._rows("SELECT channel_id, reply_id FROM flag_replies WHERE message_id = ?", (msg_id,))
+        await self._db.execute("DELETE FROM translations WHERE message_id = ?", (msg_id,))
+        await self._write("DELETE FROM flag_replies WHERE message_id = ?", (msg_id,))
+        return [tuple(row) for row in replies]

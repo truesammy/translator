@@ -184,3 +184,40 @@ async def test_database_without_the_author_column_gets_it(tmp_path):
     await store.record_own_embed(2, 1, 100, 42)
     assert await store.get_own_embed(1) == (100, None) and await store.get_own_embed(2) == (100, 42)
     await store.close()
+
+
+async def test_flag_languages(store):
+    await store.add_flag_language(1, "fr")
+    await store.add_flag_language(1, "de")
+    await store.add_flag_language(1, "de")
+    await store.add_flag_language(2, "ja")
+    assert await store.flag_languages(1) == ["de", "fr"]
+    assert await store.remove_flag_language(1, "de") and not await store.remove_flag_language(1, "de")
+    assert await store.flag_languages(1) == ["fr"]
+
+
+async def test_translations_are_cached_per_content(store):
+    await store.set_translation(5, 1, "de", "h1", b"one")
+    assert await store.get_translation(5, "de", "h1") == b"one"
+    assert await store.get_translation(5, "de", "h2") is None
+    assert await store.get_translation(5, "fr", "h1") is None
+    await store.set_translation(5, 1, "de", "h2", b"two")
+    assert await store.get_translation(5, "de", "h2") == b"two"
+
+
+async def test_forget_private(store):
+    await store.set_translation(5, 1, "de", "h", b"x")
+    await store.add_flag_reply(1, 5, 100, 6)
+    assert await store.forget_private(5) == [(100, 6)]
+    assert await store.get_translation(5, "de", "h") is None
+    assert await store.forget_private(5) == []
+
+
+async def test_delete_guild_removes_flag_data(store):
+    await store.add_flag_language(1, "de")
+    await store.set_translation(5, 1, "de", "h", b"x")
+    await store.add_flag_reply(1, 5, 100, 6)
+    await store.delete_guild(1)
+    assert await store.flag_languages(1) == []
+    assert await store.get_translation(5, "de", "h") is None
+    assert await store.forget_private(5) == []
