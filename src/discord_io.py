@@ -7,6 +7,7 @@ import aiohttp
 import discord
 
 from .db import Store
+from .flags import flag_look
 from .models import Attachment, EmbedData, EmbedField, OutgoingPart, SourceMessage
 from .relay import MessageGone
 
@@ -54,6 +55,18 @@ def data_to_embed(data: EmbedData) -> discord.Embed:
     for field in data.fields:
         embed.add_field(name=field.name, value=field.value, inline=field.inline)
     return embed
+
+
+def flag_view(custom_ids: tuple[str, ...]) -> discord.ui.View | None:
+    if not custom_ids:
+        return None
+    view = discord.ui.View(timeout=None)
+    for custom_id in custom_ids:
+        emoji, label = flag_look(custom_id.rsplit(":", 1)[1])
+        view.add_item(discord.ui.Button(custom_id=custom_id, emoji=emoji, label=label))
+    # FlagButton answers the presses. A running view would be kept in memory for every message it is sent with.
+    view.stop()
+    return view
 
 
 def snapshot(message: discord.Message, *, own_webhook_ids: set[int]) -> SourceMessage:
@@ -143,6 +156,8 @@ class DiscordPoster:
             webhook = await self.ensure_webhook(channel)
             content, files = await self._content_and_files(part, channel, upload=True)
             options = {"avatar_url": avatar_url} if avatar_url else {}
+            if part.buttons:
+                options["view"] = flag_view(part.buttons)
             try:
                 message = await webhook.send(
                     content,
@@ -174,6 +189,7 @@ class DiscordPoster:
                 content=content,
                 embeds=[data_to_embed(embed) for embed in part.embeds],
                 allowed_mentions=discord.AllowedMentions.none(),
+                view=flag_view(part.buttons),  # None drops buttons of a flag language list that became empty
             )
         except discord.NotFound:
             # Deleted by hand, or posted by an earlier webhook that was removed.

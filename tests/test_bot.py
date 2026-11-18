@@ -7,6 +7,7 @@ import translator_bot.bot as bot_module
 from translator_bot.bot import TranslatorBot
 from translator_bot.db import Store
 from translator_bot.commands.embed import register_embed_commands
+from translator_bot.commands.flags import register_flag_commands
 from translator_bot.commands.setup import register_setup_commands
 from translator_bot.config import Config
 
@@ -15,8 +16,10 @@ async def test_all_commands_register_and_are_admin_only(tmp_path):
     bot = TranslatorBot(Config("token", Fernet.generate_key(), tmp_path / "bot.db"))
     register_setup_commands(bot)
     register_embed_commands(bot)
+    register_flag_commands(bot)
     commands = {command.name: command for command in bot.tree.get_commands()}
-    assert set(commands) == {"link", "source-language", "apikey", "embed"}
+    assert set(commands) == {"link", "source-language", "apikey", "embed", "flags", "Add translation flags", "Translate"}
+    assert {c.name for c in commands["flags"].commands} == {"add", "remove", "list"}
     assert {c.name for c in commands["link"].commands} == {"add", "remove", "list"}
     assert {c.name for c in commands["apikey"].commands} == {"set", "remove", "status"}
     assert {c.name for c in commands["embed"].commands} == {"create", "edit"}

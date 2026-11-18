@@ -8,6 +8,7 @@ from discord import app_commands
 
 from .chain import TranslatorChain, build_chain
 from .commands.embed import register_embed_commands
+from .commands.flags import register_flag_commands
 from .commands.setup import register_setup_commands
 from .config import Config
 from .crypto import decrypt
@@ -49,6 +50,7 @@ class TranslatorBot(discord.Client):
         self.relay = Relay(self.store, self.poster, self.chain_for)
         register_setup_commands(self)
         register_embed_commands(self)
+        register_flag_commands(self)
         await self.tree.sync()
 
     async def close(self) -> None:
@@ -119,13 +121,14 @@ class TranslatorBot(discord.Client):
             return [
                 snapshot(message, own_webhook_ids=own)
                 async for message in channel.history(after=discord.Object(after_id), oldest_first=True, limit=None)
-                if message.type in RELAYED_TYPES
+                if message.type in RELAYED_TYPES and message.author != self.user
             ]
         except (discord.Forbidden, discord.NotFound):
             return None
 
     async def on_message(self, message: discord.Message) -> None:
-        if message.guild is None or message.type not in RELAYED_TYPES:
+        # The bot itself only posts flag replies, which are not announcements.
+        if message.guild is None or message.type not in RELAYED_TYPES or message.author == self.user:
             return
         if await self.poster.is_own_webhook(message.webhook_id):
             return
