@@ -85,8 +85,23 @@ class TranslatorBot(discord.Client):
         try:
             await prune(self.store, self.relay, self._guild_exists, self._channel_exists)
             await reconcile(self.store, self.relay, self._fetch_history, datetime.now(UTC))
+            await self._drop_orphan_flag_replies()
         except Exception:
             log.exception("Catch-up failed")
+
+    async def _drop_orphan_flag_replies(self) -> None:
+        """Delete Translate-button replies whose message was deleted while the bot was offline."""
+        # shortcut: one fetch per reply on every reconnect, fine for replies added by hand
+        for message_id, channel_id in await self.store.flag_reply_messages():
+            channel = self.get_channel(channel_id)
+            if channel is None:
+                continue
+            try:
+                await channel.fetch_message(message_id)
+            except discord.NotFound:
+                await self.relay.handle_delete(message_id)
+            except discord.HTTPException:
+                pass  # an outage proves nothing
 
     async def _guild_exists(self, guild_id: int) -> bool:
         if self.get_guild(guild_id):

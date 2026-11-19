@@ -8,11 +8,10 @@ from discord import app_commands
 
 from ..discord_io import data_to_embed, embed_to_data, sanitize_username, snapshot
 from ..models import EmbedData
+from .setup import ADMIN_ONLY
 
 if TYPE_CHECKING:
     from ..bot import TranslatorBot
-
-ADMIN_ONLY = discord.Permissions(manage_guild=True)
 
 
 class EmbedInputError(ValueError):

@@ -72,6 +72,7 @@ class KeyModal(discord.ui.Modal, title="DeepL API key"):
             await interaction.followup.send("DeepL rejected that key. Nothing was saved.", ephemeral=True)
             return
         await self.bot.store.set_deepl_key(interaction.guild_id, encrypt(self.bot.config.fernet_key, key))
+        await self.bot.store.forget_translations(interaction.guild_id)  # the next press translates with DeepL
         self.bot.start_catch_up()  # messages that failed without a key get their translation now
         await interaction.followup.send(
             f"DeepL key saved. {used:,} of {limit:,} characters used this period.", ephemeral=True
@@ -173,12 +174,13 @@ def register_setup_commands(bot: "TranslatorBot") -> None:
     @app_commands.describe(channel="Source channel", language="Its language, or detect automatically")
     @app_commands.autocomplete(language=source_language_autocomplete)
     async def source_language(interaction: discord.Interaction, channel: discord.TextChannel, language: str) -> None:
+        if language != AUTO[1] and get_language(language) is None:
+            return await reply(interaction, "Unknown language. Pick one from the list.")
+        await bot.store.forget_translations(interaction.guild_id)  # made with the old source language
         if language == AUTO[1]:
             await bot.store.set_source_language(interaction.guild_id, channel.id, None)
             return await reply(interaction, f"The language of {channel.mention} is detected automatically.")
         lang = get_language(language)
-        if lang is None:
-            return await reply(interaction, "Unknown language. Pick one from the list.")
         await bot.store.set_source_language(interaction.guild_id, channel.id, lang.code)
         await reply(interaction, f"Messages in {channel.mention} are treated as {lang.name}.")
 

@@ -1,4 +1,5 @@
 import logging
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 import discord
@@ -38,8 +39,13 @@ async def send_translation(interaction: discord.Interaction, channel_id: int, me
     await interaction.response.defer(ephemeral=True, thinking=True)
     bot: "TranslatorBot" = interaction.client
     channel = bot.get_channel(channel_id)
-    # The original may sit in a channel the presser cannot see, but never in another server.
-    if channel is None or channel.guild.id != interaction.guild_id:
+    # The ids come from the client. Only a message of this channel, or the source of a copy
+    # posted here, may be read: the source may sit in a channel the presser cannot see.
+    here = interaction.channel_id
+    allowed = channel_id == here or any(
+        link.target_channel_id == here for link in await bot.store.links_for_source(channel_id)
+    )
+    if not allowed or channel is None or channel.guild.id != interaction.guild_id:
         return await answer("This message is no longer available.")
     try:
         message = await channel.fetch_message(message_id)
@@ -120,6 +126,8 @@ def register_flag_commands(bot: "TranslatorBot") -> None:
     async def flags_add(interaction: discord.Interaction, language: str, role: discord.Role | None = None) -> None:
         if get_language(language) is None:
             return await reply(interaction, "Unknown language. Pick one from the list.")
+        if role is not None and role.is_default():  # everyone has it, so readers of the others would always pick
+            return await reply(interaction, "Pick a role other than @everyone.")
         codes = [code for code, _ in await bot.store.flag_languages(interaction.guild_id)]
         if language not in codes and len(codes) >= MAX_FLAGS:
             return await reply(interaction, f"At most {MAX_FLAGS} languages fit on the buttons.")
@@ -149,6 +157,10 @@ def register_flag_commands(bot: "TranslatorBot") -> None:
             sent = await message.reply(view=view, mention_author=False)
         except discord.HTTPException as error:
             return await reply(interaction, f"Could not reply there: {error.text or error.status}")
+        # A message keeps one reply: an earlier one would never be deleted with it.
+        for channel_id, reply_id in await bot.store.forget_private(message.id):
+            with suppress(discord.HTTPException):
+                await bot.poster.delete(channel_id, reply_id)
         await bot.store.add_flag_reply(interaction.guild_id, message.id, message.channel.id, sent.id)
         await reply(interaction, "Translate button added.")
 

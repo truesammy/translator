@@ -213,6 +213,19 @@ async def test_forget_private(store):
     assert await store.forget_private(5) == []
 
 
+async def test_flag_reply_messages(store):
+    await store.add_flag_reply(1, 5, 100, 6)
+    assert await store.flag_reply_messages() == [(5, 100)]
+
+
+async def test_forget_translations_of_one_server(store):
+    await store.set_translation(5, 1, "de", "h", b"x")
+    await store.set_translation(6, 2, "de", "h", b"y")
+    await store.forget_translations(1)
+    assert await store.get_translation(5, "de", "h") is None
+    assert await store.get_translation(6, "de", "h") == b"y"
+
+
 async def test_delete_guild_removes_flag_data(store):
     await store.add_flag_language(1, "de", None)
     await store.set_translation(5, 1, "de", "h", b"x")

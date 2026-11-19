@@ -12,7 +12,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements.txt -e ".[dev]"
+      - run: pip install -r requirements.txt -e ".[dev]" pyflakes
+      # Catches undefined names in branches no test runs.
+      - run: python -m pyflakes src tests scripts
       - run: python -m pytest -q
 
   image:

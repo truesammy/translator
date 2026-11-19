@@ -110,7 +110,10 @@ reuses it. An edit of the announcement makes the next press translate once more.
 are not repeated in the private reply.
 
 The *Translate* menu is for admins only at first. To offer it to everyone, open
-**Server Settings → Integrations → the bot → Translate** and allow `@everyone`.
+**Server Settings → Integrations → the bot → Translate** and allow `@everyone`. Then anyone can
+translate any message, chat included, into every offered language, and each first translation
+uses the server's DeepL characters: one member can use up a free key's month in minutes. After
+that Google takes over, which blocks quickly.
 
 ## Translation order
 

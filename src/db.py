@@ -277,6 +277,14 @@ class Store:
             (msg_id, guild_id, channel_id, reply_id),
         )
 
+    async def flag_reply_messages(self) -> list[tuple[int, int]]:
+        """(message, channel) of every message that got a Translate-button reply."""
+        return [tuple(row) for row in await self._rows("SELECT message_id, channel_id FROM flag_replies")]
+
+    async def forget_translations(self, guild_id: int) -> None:
+        """Stored translations of a server, to be made again after its translation settings changed."""
+        await self._write("DELETE FROM translations WHERE guild_id = ?", (guild_id,))
+
     async def forget_private(self, msg_id: int) -> list[tuple[int, int]]:
         """Drop a message's stored translations and flag reply. Returns (channel, reply) of the reply."""
         replies = await self._rows("SELECT channel_id, reply_id FROM flag_replies WHERE message_id = ?", (msg_id,))
